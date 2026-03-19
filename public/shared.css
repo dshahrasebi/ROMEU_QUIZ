@@ -1,0 +1,173 @@
+/* ── Tile palette ─────────────────────────────────────────────────────────── */
+:root {
+  --tile-red:    #E21B3C;
+  --tile-blue:   #1368CE;
+  --tile-yellow: #D89E00;
+  --tile-green:  #26890C;
+}
+
+/* ── Base ─────────────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Nunito', sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Background ──────────────────────────────────────────────────────────── */
+.gradient-bg {
+  background: radial-gradient(ellipse at center, #8B2FC9 0%, #46178F 100%);
+  min-height: 100vh;
+  color: #fff;
+}
+
+/* ── Answer tiles ────────────────────────────────────────────────────────── */
+.answer-tile {
+  min-height: 25vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  border-radius: 12px;
+  cursor: pointer;
+  user-select: none;
+  touch-action: manipulation;
+  transition: transform 0.1s;
+  font-family: 'Nunito', sans-serif;
+  font-weight: 700;
+  font-size: 1.25rem;
+  color: #fff;
+  padding: 16px;
+  word-break: break-word;
+  text-align: center;
+}
+
+.answer-tile:active {
+  transform: scale(0.96);
+}
+
+.answer-tile.disabled {
+  pointer-events: none;
+  opacity: 0.6;
+}
+
+.answer-tile.selected {
+  outline: 4px solid #fff;
+  outline-offset: -4px;
+}
+
+.answer-tile.correct-reveal {
+  outline: 6px solid #fff;
+  transform: scale(1.05);
+}
+
+/* ── Tile colours ────────────────────────────────────────────────────────── */
+.tile-red    { background: var(--tile-red); }
+.tile-blue   { background: var(--tile-blue); }
+.tile-yellow { background: var(--tile-yellow); }
+.tile-green  { background: var(--tile-green); }
+
+/* ── Shape icons ─────────────────────────────────────────────────────────── */
+.shape-icon {
+  font-size: 2rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+/* ── SVG countdown ring ──────────────────────────────────────────────────── */
+.countdown-ring circle {
+  fill: none;
+  stroke: #fff;
+  stroke-width: 8;
+  transition: stroke-dashoffset linear;
+}
+
+/* ── Podium pillar ───────────────────────────────────────────────────────── */
+.pillar {
+  transform-origin: bottom;
+  border-radius: 8px 8px 0 0;
+}
+
+/* ── Animations ──────────────────────────────────────────────────────────── */
+
+@keyframes spring-in {
+  0%   { transform: scale(0); }
+  60%  { transform: scale(1.2); }
+  100% { transform: scale(1); }
+}
+.spring-in {
+  animation: spring-in 0.45s cubic-bezier(.34, 1.56, .64, 1) forwards;
+}
+
+@keyframes count-bounce {
+  0%, 100% { transform: translateY(0); }
+  45%      { transform: translateY(-10px); }
+  65%      { transform: translateY(-5px); }
+}
+.count-bounce {
+  animation: count-bounce 0.6s ease-out;
+}
+
+@keyframes stagger-slide {
+  from { transform: translateX(-120%); opacity: 0; }
+  to   { transform: translateX(0);     opacity: 1; }
+}
+.stagger-slide {
+  animation: stagger-slide 0.4s ease-out both;
+}
+
+@keyframes pillar-rise {
+  from { transform: scaleY(0); }
+  to   { transform: scaleY(1); }
+}
+.pillar-rise {
+  animation: pillar-rise 0.8s ease-out both;
+}
+
+/* ── Confetti ────────────────────────────────────────────────────────────── */
+.confetti-piece {
+  position: fixed;
+  top: -10px;
+  left: var(--x);
+  width: 8px;
+  height: 16px;
+  background: var(--color);
+  border-radius: 2px;
+  pointer-events: none;
+  z-index: 9999;
+  animation:
+    confetti-fall var(--duration) ease-in var(--delay) forwards;
+}
+
+@keyframes confetti-fall {
+  0%   { transform: translateY(0)     rotateZ(0deg)   rotateX(0deg);   opacity: 1; }
+  80%  { opacity: 1; }
+  100% { transform: translateY(110vh) rotateZ(720deg) rotateX(540deg); opacity: 0; }
+}
+
+/* ── Lobby chip ──────────────────────────────────────────────────────────── */
+@keyframes chip-pop {
+  0%   { transform: scale(0); opacity: 0; }
+  70%  { transform: scale(1.15); }
+  100% { transform: scale(1);   opacity: 1; }
+}
+.chip-pop {
+  animation: chip-pop 0.3s cubic-bezier(.34, 1.56, .64, 1) forwards;
+}
+
+/* ── Tally bar ───────────────────────────────────────────────────────────── */
+.tally-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.8s ease-out;
+  width: 0;
+}
+
+/* ── Utility ─────────────────────────────────────────────────────────────── */
+.pulse {
+  animation: pulse-opacity 1.5s ease-in-out infinite;
+}
+@keyframes pulse-opacity {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.5; }
+}

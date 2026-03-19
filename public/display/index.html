@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Display · Quiz Platform</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;900&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="/shared.css">
+  <script src="/socket.io/socket.io.js"></script>
+  <style>
+    html, body { overflow: hidden; }
+    #stage { min-height: 100vh; }
+
+    /* Distribution bars */
+    .dist-bar-fill {
+      height: 100%;
+      border-radius: 4px;
+      width: 0;
+      transition: width 0.8s ease-out;
+    }
+
+    /* Pillar override */
+    .podium-pillar {
+      transform-origin: bottom;
+      border-radius: 8px 8px 0 0;
+      animation: pillar-rise 0.8s ease-out both;
+    }
+  </style>
+</head>
+<body class="gradient-bg">
+<div id="stage" class="flex items-center justify-center p-8"></div>
+
+<script>
+/* ════════════════════════════════════════════════════════════════════════════
+   Display view — full-screen projector
+   ════════════════════════════════════════════════════════════════════════════ */
+
+const pin = new URLSearchParams(location.search).get('pin');
+const stage = document.getElementById('stage');
+let currentState = null;
+let ringRaf = null;
+
+// ── Socket connection ─────────────────────────────────────────────────────────
+
+const socket = io({ transports: ['websocket'] });
+
+socket.on('connect', () => {
+  socket.emit('display-join', { pin });
+});
+
+socket.on('display-state', (data) => {
+  currentState = data;
+  renderPhase(data);
+});
+
+socket.on('lobby-update', (data) => {
+  if (!currentState || currentState.status !== 'lobby') return;
+  const el = document.getElementById('lobby-player-count');
+  if (el) el.textContent = `${data.playerCount} player${data.playerCount !== 1 ? 's' : ''} joined`;
+});
+
+socket.on('question-start', (data) => {
+  Object.assign(currentState || (currentState = {}), data, { status: 'question' });
+  renderPhase(currentState);
+});
+
+socket.on('question-reveal', (data) => {
+  if (currentState) currentState.status = 'reveal';
+  renderPhase({ ...currentState, ...data, status: 'reveal' });
+});
+
+socket.on('leaderboard-update', (data) => {
+  if (currentState) currentState.status = 'leaderboard';
+  renderPhase({ ...currentState, ...data, status: 'leaderboard' });
+});
+
+socket.on('game-ended', (data) => {
+  renderPhase({ ...data, status: 'ended' });
+});
+
+// ── Phase renderer ────────────────────────────────────────────────────────────
+
+function renderPhase(state) {
+  cancelRing();
+
+  switch (state.status) {
+    case 'lobby':
+      renderLobby(state);
+      break;
+    case 'question':
+      renderQuestion(state);
+      break;
+    case 'reveal':
+      renderReveal(state);
+      break;
+    case 'leaderboard':
+      renderLeaderboard(state);
+      break;
+    case 'ended':
+      renderEnded(state);
+      break;
+    default:
+      stage.innerHTML = `
+        <div class="text-center">
+          <div class="text-6xl mb-4">🎮</div>
+          <h1 class="text-4xl font-black">Waiting for host…</h1>
+        </div>`;
+  }
+}
+
+// ── Lobby ─────────────────────────────────────────────────────────────────────
+
+function renderLobby(state) {
+  stage.innerHTML = `
+    <div class="flex flex-col items-center gap-8 w-full max-w-2xl">
+      <h1 class="text-5xl font-black text-center">Join the game!</h1>
+
+      ${state.qrDataUrl
+        ? `<img src="${state.qrDataUrl}" alt="QR Code to join" class="rounded-2xl shadow-2xl" style="width:280px;height:280px">`
+        : '<div class="w-64 h-64 bg-white/20 rounded-2xl flex items-center justify-center"><span class="text-white/40 font-bold">No QR</span></div>'
+      }
+
+      <div class="text-center">
+        <p class="text-white/70 font-bold text-xl mb-1">Game PIN</p>
+        <p class="font-black tracking-widest font-mono" style="font-size:80px;letter-spacing:0.25em">
+          ${esc(state.pin || '——')}
+        </p>
+        <p class="text-white/60 font-bold text-lg mt-1">or scan the QR code</p>
+      </div>
+
+      <p id="lobby-player-count" class="text-2xl font-bold text-white/80">
+        ${(state.playerCount || 0)} player${(state.playerCount || 0) !== 1 ? 's' : ''} joined
+      </p>
+    </div>
+  `;
+}
+
+// ── Question ──────────────────────────────────────────────────────────────────
+
+const TILE_COLORS  = ['#E21B3C','#1368CE','#D89E00','#26890C'];
+const TILE_SHAPES  = ['▲','◆','●','■'];
+
+function renderQuestion(state) {
+  const q = state.questions
+    ? state.questions[state.currentQuestionIndex]
+    : { text: state.text, options: state.options, time_limit_seconds: state.timeLimitSeconds };
+  if (!q) return;
+
+  const tls = q.time_limit_seconds || state.timeLimitSeconds || 20;
+  const circumference = 2 * Math.PI * 54;
+  const elapsedMs = state.questionOpenAt ? Date.now() - state.questionOpenAt : (state.elapsedMs || 0);
+
+  stage.innerHTML = `
+    <div class="flex flex-col w-full h-screen gap-0">
+
+      <!-- Question header -->
+      <div class="flex items-center justify-between px-10 pt-6 pb-4 flex-shrink-0">
+        <span class="bg-white/20 px-4 py-2 rounded-full font-black text-lg">
+          Q ${(state.currentQuestionIndex ?? 0) + 1} / ${state.totalQuestions || (state.questions?.length) || '?'}
+        </span>
+
+        <!-- SVG countdown ring -->
+        <div class="flex flex-col items-center gap-1">
+          <svg viewBox="0 0 120 120" width="90" height="90">
+            <circle id="ring-bg" cx="60" cy="60" r="54"
+              fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="8"/>
+            <circle id="ring-circle" cx="60" cy="60" r="54"
+              fill="none" stroke="#fff" stroke-width="8"
+              stroke-dasharray="${circumference}"
+              stroke-dashoffset="0"
+              stroke-linecap="round"
+              style="transform:rotate(-90deg);transform-origin:center"/>
+          </svg>
+          <span id="ring-timer" class="font-black text-2xl -mt-8" style="position:relative;z-index:1">${tls}</span>
+        </div>
+      </div>
+
+      <!-- Question text -->
+      <div class="flex items-center justify-center flex-1 px-10">
+        <h2 class="font-black text-center leading-tight"
+          style="font-size:clamp(2.5rem,5vw,4.5rem)">
+          ${esc(q.text)}
+        </h2>
+      </div>
+
+      <!-- Tiles -->
+      <div class="grid grid-cols-2 gap-4 px-6 pb-6" style="height:38vh">
+        ${(q.options || state.options || []).map((opt, i) => `
+          <div class="answer-tile" style="background:${TILE_COLORS[i]};min-height:0;cursor:default">
+            <span class="shape-icon">${TILE_SHAPES[i]}</span>
+            <span class="font-black text-xl truncate max-w-full">${esc(opt)}</span>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+
+  // Start ring animation
+  startRing(tls, elapsedMs, circumference);
+}
+
+function startRing(tls, alreadyElapsedMs, circumference) {
+  const ring = document.getElementById('ring-circle');
+  const timerLabel = document.getElementById('ring-timer');
+  if (!ring) return;
+
+  const totalMs = tls * 1000;
+  const remaining = Math.max(0, totalMs - alreadyElapsedMs);
+  let startTs = null;
+
+  function frame(ts) {
+    if (!startTs) startTs = ts;
+    const elapsed = ts - startTs;
+    const timeLeft = Math.max(0, remaining - elapsed);
+    const ratio = timeLeft / totalMs;
+    ring.style.strokeDashoffset = circumference * (1 - ratio);
+    timerLabel.textContent = Math.ceil(timeLeft / 1000);
+    if (timeLeft > 0 && document.getElementById('ring-circle')) {
+      ringRaf = requestAnimationFrame(frame);
+    }
+  }
+
+  ringRaf = requestAnimationFrame(frame);
+}
+
+function cancelRing() {
+  if (ringRaf) { cancelAnimationFrame(ringRaf); ringRaf = null; }
+}
+
+// ── Reveal ────────────────────────────────────────────────────────────────────
+
+function renderReveal(state) {
+  const q = state.questions
+    ? state.questions[state.questionIndex ?? state.currentQuestionIndex]
+    : { options: state.options || [] };
+
+  const correctIdx = state.correctIndex;
+  const tally = state.answerCounts || state.tally || [0,0,0,0];
+  const total  = tally.reduce((a,b) => a+b, 0);
+  const max    = Math.max(...tally, 1);
+
+  const opts = q?.options || state.options || ['','','',''];
+
+  stage.innerHTML = `
+    <div class="flex flex-col w-full h-screen gap-0 px-10 py-8">
+      <h2 class="text-3xl font-black text-center mb-6">Answer Reveal</h2>
+      <div class="space-y-4 flex-1">
+        ${opts.map((opt, i) => `
+          <div class="flex items-center gap-4" style="animation: stagger-slide 0.4s ease-out both; animation-delay:${i*100}ms">
+            <div class="rounded-xl flex items-center justify-center w-14 h-14 flex-shrink-0 text-2xl font-black
+              ${i === correctIdx ? 'ring-4 ring-white scale-110 transition-transform spring-in' : 'opacity-70'}"
+              style="background:${TILE_COLORS[i]}">
+              ${i === correctIdx ? '✓' : TILE_SHAPES[i]}
+            </div>
+            <div class="flex-1">
+              <div class="text-sm font-bold mb-1 ${i === correctIdx ? '' : 'text-white/70'}">${esc(opt)}</div>
+              <div class="bg-white/20 rounded-full h-8 overflow-hidden">
+                <div class="dist-bar-fill h-full rounded-full"
+                  id="dist-bar-${i}"
+                  style="background:${TILE_COLORS[i]};width:0%"></div>
+              </div>
+            </div>
+            <span class="font-black text-xl w-10 text-right">${tally[i]}</span>
+          </div>
+        `).join('')}
+      </div>
+      <p class="text-center text-white/50 font-bold mt-4">${total} answer${total !== 1 ? 's' : ''} received</p>
+    </div>
+  `;
+
+  // Animate bars after render
+  setTimeout(() => {
+    for (let i = 0; i < 4; i++) {
+      const bar = document.getElementById(`dist-bar-${i}`);
+      if (bar) bar.style.width = `${(tally[i] / max) * 100}%`;
+    }
+  }, 80);
+}
+
+// ── Leaderboard ───────────────────────────────────────────────────────────────
+
+function renderLeaderboard(state) {
+  const list = state.leaderboard || [];
+
+  stage.innerHTML = `
+    <div class="flex flex-col w-full max-w-2xl mx-auto gap-6">
+      <h1 class="text-4xl font-black text-center">🏆 Leaderboard</h1>
+      <div class="space-y-3">
+        ${list.map((p, i) => `
+          <div class="flex items-center gap-4 bg-white/10 backdrop-blur rounded-2xl px-5 py-3 stagger-slide"
+            style="animation-delay:${i*120}ms">
+            <span class="text-3xl font-black w-10 text-center">${i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : p.rank}</span>
+            <span class="flex-1 text-2xl font-black">${esc(p.nickname)}</span>
+            <span class="text-2xl font-black">${p.score}</span>
+          </div>
+        `).join('')}
+        ${!list.length ? '<p class="text-center text-white/50 font-bold">No players yet</p>' : ''}
+      </div>
+    </div>
+  `;
+}
+
+// ── Game ended / podium ───────────────────────────────────────────────────────
+
+function renderEnded(state) {
+  if (state.archived) {
+    stage.innerHTML = `
+      <div class="text-center">
+        <div class="text-6xl mb-4">📁</div>
+        <h1 class="text-4xl font-black">Session Ended</h1>
+        <p class="text-white/60 font-bold mt-3 text-xl">The game has been archived.</p>
+      </div>`;
+    return;
+  }
+
+  const podium = (state.podium || []).slice(0, 3);
+  const allPlayers = state.allPlayers || [];
+  if (!podium.length) { renderLeaderboard({ leaderboard: allPlayers }); return; }
+
+  const maxScore = Math.max(...podium.map(p => p.score), 1);
+  const heights  = podium.map(p => Math.round((p.score / maxScore) * 220 + 60));
+  // Display order: 2nd, 1st, 3rd
+  const displayOrder = [1, 0, 2].filter(i => podium[i]);
+  const PODIUM_COLORS = ['#F5C518','#C0C0C0','#CD7F32'];
+  const delays = [0.6, 1.0, 0.3];
+
+  stage.innerHTML = `
+    <div class="flex flex-col items-center w-full gap-8">
+      <h1 class="text-5xl font-black">🏆 Final Podium</h1>
+
+      <!-- Podium columns -->
+      <div class="flex items-end gap-8 justify-center" style="height:340px">
+        ${displayOrder.map(i => {
+          const p = podium[i];
+          if (!p) return '';
+          return `
+            <div class="flex flex-col items-center" style="order:${i === 0 ? 1 : i === 1 ? 0 : 2}">
+              <p class="font-black text-xl mb-2 text-center max-w-32 truncate">${esc(p.nickname)}</p>
+              <p class="text-2xl font-black mb-2">${p.score}</p>
+              <div class="podium-pillar flex items-end justify-center pb-3 text-4xl w-28"
+                style="height:${heights[i]}px;background:${PODIUM_COLORS[i]};animation-delay:${delays[i]}s">
+                ${['🥇','🥈','🥉'][i]}
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+
+      <!-- Full leaderboard -->
+      <div class="w-full max-w-xl space-y-2 max-h-48 overflow-y-auto px-4">
+        ${allPlayers.slice(3).map((p, idx) => `
+          <div class="flex items-center gap-3 bg-white/10 rounded-xl px-4 py-2">
+            <span class="font-black w-6 text-white/60">${p.rank}</span>
+            <span class="flex-1 font-bold">${esc(p.nickname)}</span>
+            <span class="font-black">${p.score}</span>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+}
+
+// ── Utilities ─────────────────────────────────────────────────────────────────
+
+function esc(str) {
+  return String(str ?? '')
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;');
+}
+</script>
+</body>
+</html>

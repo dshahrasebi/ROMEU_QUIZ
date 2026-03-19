@@ -104,7 +104,7 @@ Players who answer correctly and quickly earn more points than players who answe
 - What happens when zero players join but the host advances questions? The session remains functional and shows empty leaderboards without crashing.
 - What happens when the host tries to start a session with a quiz that has no questions? The system prevents the session from starting and informs the host to add at least one question first.
 - What happens when the PIN a player enters does not match any active session? The player sees a clear error message and is invited to try again.
-- What happens when 50+ players are in the lobby simultaneously? The display view and host view remain responsive with no visible lag in answer count updates or leaderboard rendering.
+- What happens when 30 players are in the lobby simultaneously? The display view and host view remain responsive with no visible lag in answer count updates or leaderboard rendering.
 
 ## Requirements *(mandatory)*
 
@@ -180,7 +180,7 @@ Players who answer correctly and quickly earn more points than players who answe
 
 - **SC-001**: A host can create a quiz with 10 questions and launch a live session within 5 minutes of first using the platform.
 - **SC-002**: A player can join an active session, enter a nickname, and see the first question on their phone within 30 seconds of scanning the QR code.
-- **SC-003**: The platform supports at least 50 simultaneous players in a single session without visible lag in the display view or player response acknowledgement.
+- **SC-003**: The platform supports at least 30 simultaneous players in a single session without visible lag in the display view or player response acknowledgement.
 - **SC-004**: All connected views (display, host, players) reflect question state changes within 1 second of the host triggering the change.
 - **SC-005**: 95% of players successfully submit an answer on their first attempt without UI confusion — answer tiles respond reliably to a single touch on mobile.
 - **SC-006**: The display view is visually indistinguishable from a production quiz platform in screenshots — the violet gradient, countdown ring, answer distribution bars, staggered leaderboard, and podium columns all render with polished animation quality.
@@ -192,8 +192,18 @@ Players who answer correctly and quickly earn more points than players who answe
 - A single host per session is assumed; no multi-host or collaborative editing scenario is in scope.
 - The platform is intended for use on a shared network (such as a training room's WiFi) but should also function over the public internet.
 - No authentication is required for players — they join anonymously by PIN and nickname only.
-- No login mechanism for hosts is specified; the admin panel is assumed to be protected by deployment context (e.g., known internal URL) rather than a login screen.
+- The host admin panel is protected by a server-side login form that POSTs credentials to an Express endpoint. The server compares the submitted password against the `HOST_PASSWORD` environment variable using `crypto.timingSafeEqual()` to prevent timing attacks. On success, the server issues a signed `httpOnly`, `secure`, `sameSite=strict` session cookie via `express-session` with a 4-hour TTL. All subsequent requests to `/host/*` validate the session server-side. A logout button destroys the session and clears the cookie. The password is never transmitted after the initial POST and never stored client-side.
 - Session history and past game results are not required to be stored after a session ends — only current active session data needs to persist during gameplay.
 - Each question has exactly four answer options; variable option counts are out of scope.
 - Audio (sound effects, background music) is out of scope for this iteration.
 - The platform targets modern mobile browsers; no native app installation should be required of players.
+
+## Clarifications
+
+### Session 2026-03-19
+
+- Q: How should the host admin panel be protected? → A: Server-side session cookie via `express-session`; login form POSTs to Express endpoint; `crypto.timingSafeEqual()` for password comparison; `httpOnly`/`secure`/`sameSite=strict` cookie; 4-hour TTL; logout button. Password only lives in `HOST_PASSWORD` env var — never client-side, never in source code.
+- Q: What happens to an active game session if the server restarts mid-game? → A: Active session state (current question index, player list, scores, all answer submissions) is persisted to SQLite on every state transition. On server startup, if an interrupted session exists in the database it is automatically resumed — the host panel reflects the last known state and players who reconnect are restored to their scores.
+- Q: How should the QR code know the correct public URL to encode? → A: A `BASE_URL` environment variable is set in the Railway dashboard (e.g. `https://romeu-quiz.up.railway.app`). The server reads it at startup and uses it when generating QR codes (`BASE_URL/play?pin=XXXXXX`). For local development, `BASE_URL=http://localhost:3000` is set in `.env`. The variable is required — the server must refuse to start if it is absent.
+- Q: How should multiple quiz rounds within one training session be handled? → A: Only one active session exists at a time. When the host starts a new session, the previous session is marked `ended` in SQLite (preserving its results for reference) and a fresh in-memory game begins. The host can freely run back-to-back rounds with any saved quiz without restarting the server.
+- Q: What is the maximum expected number of simultaneous players per session? → A: Up to 30 players. This is the target concurrent-user ceiling the implementation must be designed and tested against. SQLite WAL mode handles this volume without contention. No special Socket.io fanout optimisation is required beyond standard room broadcasting.

@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>Join Quiz</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;900&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="/shared.css">
+  <script src="/socket.io/socket.io.js"></script>
+  <style>
+    html, body { height: 100%; overflow: hidden; }
+    .screen { display: none; }
+    .screen.active { display: flex; }
+    .tile-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: 1fr 1fr;
+      gap: 12px;
+      flex: 1;
+      min-height: 0;
+    }
+    .answer-tile { min-height: 0; font-size: 1.1rem; }
+    #screen-lobby .chip-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: center;
+      max-height: 40vh;
+      overflow-y: auto;
+    }
+  </style>
+</head>
+<body class="gradient-bg flex flex-col h-screen">
+
+<!-- ── Screen 1: PIN entry ────────────────────────────────────────────────── -->
+<div id="screen-pin" class="screen active flex-col items-center justify-center h-full p-6 gap-5">
+  <div class="text-center">
+    <div class="text-5xl mb-2">🎮</div>
+    <h1 class="text-3xl font-black">Join a Game</h1>
+  </div>
+  <div class="w-full max-w-xs space-y-3">
+    <input id="pin-input" type="tel" inputmode="numeric" maxlength="6" placeholder="Game PIN"
+      class="w-full text-center text-3xl font-black text-gray-800 rounded-2xl px-4 py-4 focus:outline-none focus:ring-4 focus:ring-purple-300 tracking-widest">
+    <p id="pin-error" class="hidden text-red-300 text-sm font-bold text-center"></p>
+    <button id="btn-pin-join"
+      class="w-full bg-white text-purple-800 font-black text-xl rounded-2xl py-4 hover:bg-purple-50 transition-colors shadow-lg">
+      Join →
+    </button>
+  </div>
+</div>
+
+<!-- ── Screen 2: Nickname ─────────────────────────────────────────────────── -->
+<div id="screen-nickname" class="screen flex-col items-center justify-center h-full p-6 gap-5">
+  <div class="text-center">
+    <h1 class="text-3xl font-black">Pick a Nickname</h1>
+    <p class="text-white/60 mt-1 font-bold">Up to 20 characters</p>
+  </div>
+  <div class="w-full max-w-xs space-y-3">
+    <input id="nickname-input" type="text" maxlength="20" placeholder="Your nickname"
+      autocomplete="off" autocorrect="off" autocapitalize="words" spellcheck="false"
+      class="w-full text-center text-2xl font-black text-gray-800 rounded-2xl px-4 py-4 focus:outline-none focus:ring-4 focus:ring-purple-300">
+    <p id="nickname-error" class="hidden text-red-300 text-sm font-bold text-center"></p>
+    <button id="btn-nickname-join"
+      class="w-full bg-white text-purple-800 font-black text-xl rounded-2xl py-4 hover:bg-purple-50 transition-colors shadow-lg">
+      Enter Game
+    </button>
+  </div>
+</div>
+
+<!-- ── Screen 3: Lobby ────────────────────────────────────────────────────── -->
+<div id="screen-lobby" class="screen flex-col items-center justify-center h-full p-6 gap-4">
+  <div class="text-center">
+    <h1 class="text-3xl font-black">Get ready! 🎮</h1>
+    <p class="text-xl font-bold mt-2"><span id="lobby-count">0</span> player(s) joined</p>
+  </div>
+  <div class="chip-grid w-full max-w-sm px-4"></div>
+  <p class="pulse text-white/60 font-bold text-sm mt-4">Waiting for host to start…</p>
+</div>
+
+<!-- ── Screen 4: Question ─────────────────────────────────────────────────── -->
+<div id="screen-question" class="screen flex-col h-full p-4 gap-4">
+  <div class="text-center">
+    <span id="q-progress" class="bg-white/20 px-3 py-1 rounded-full text-sm font-bold"></span>
+  </div>
+  <div id="q-text" class="text-center font-black text-xl leading-snug px-2 flex-shrink-0"></div>
+  <div class="tile-grid">
+    <button class="answer-tile tile-red" data-index="0">
+      <span class="shape-icon">▲</span>
+      <span class="opt-label" data-index="0"></span>
+    </button>
+    <button class="answer-tile tile-blue" data-index="1">
+      <span class="shape-icon">◆</span>
+      <span class="opt-label" data-index="1"></span>
+    </button>
+    <button class="answer-tile tile-yellow" data-index="2">
+      <span class="shape-icon">●</span>
+      <span class="opt-label" data-index="2"></span>
+    </button>
+    <button class="answer-tile tile-green" data-index="3">
+      <span class="shape-icon">■</span>
+      <span class="opt-label" data-index="3"></span>
+    </button>
+  </div>
+</div>
+
+<!-- ── Screen 5: Feedback ─────────────────────────────────────────────────── -->
+<div id="screen-feedback" class="screen flex-col items-center justify-center h-full p-6 gap-5 text-center">
+  <div id="feedback-icon" class="text-8xl spring-in"></div>
+  <div id="feedback-result" class="text-2xl font-black"></div>
+  <div id="feedback-score" class="text-5xl font-black count-bounce">0</div>
+  <div id="feedback-rank" class="text-white/70 font-bold text-lg"></div>
+  <div id="feedback-waiting" class="hidden pulse text-white/50 font-bold text-sm mt-2">
+    Waiting for next question…
+  </div>
+</div>
+
+<!-- ── Screen 6: Game ended ───────────────────────────────────────────────── -->
+<div id="screen-ended" class="screen flex-col items-center justify-center h-full p-6 gap-5 text-center">
+  <div class="text-6xl">🎉</div>
+  <h1 class="text-3xl font-black">Thanks for playing!</h1>
+  <p class="text-white/70 font-bold text-xl">Final score: <span id="ended-score" class="text-white font-black">0</span></p>
+  <p id="ended-rank" class="text-white/60 font-bold"></p>
+</div>
+
+<script>
+/* ════════════════════════════════════════════════════════════════════════════
+   Player app
+   ════════════════════════════════════════════════════════════════════════════ */
+
+const CONFETTI_COLORS = ['#E21B3C','#1368CE','#D89E00','#26890C','#FFFFFF','#FF69B4'];
+
+let socket = null;
+let savedPin = '';
+let savedNickname = '';
+let savedPlayerId = null;
+let currentScore = 0;
+
+// ── Screen helpers ────────────────────────────────────────────────────────────
+
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(el => el.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+// ── PIN screen ────────────────────────────────────────────────────────────────
+
+document.getElementById('btn-pin-join').onclick = validatePin;
+document.getElementById('pin-input').addEventListener('keypress', e => { if (e.key === 'Enter') validatePin(); });
+
+async function validatePin() {
+  const pin = document.getElementById('pin-input').value.trim();
+  if (!pin) return;
+  try {
+    const res = await fetch(`/api/session/${pin}`);
+    if (!res.ok) {
+      showPinError('Game not found — check the PIN');
+      return;
+    }
+    savedPin = pin;
+    showScreen('screen-nickname');
+    document.getElementById('nickname-input').focus();
+  } catch {
+    showPinError('Cannot connect — try again');
+  }
+}
+
+function showPinError(msg) {
+  const el = document.getElementById('pin-error');
+  el.textContent = msg;
+  el.classList.remove('hidden');
+}
+
+// ── Nickname screen ───────────────────────────────────────────────────────────
+
+document.getElementById('btn-nickname-join').onclick = joinGame;
+document.getElementById('nickname-input').addEventListener('keypress', e => { if (e.key === 'Enter') joinGame(); });
+
+function joinGame() {
+  const nickname = document.getElementById('nickname-input').value.trim();
+  if (!nickname) {
+    showNicknameError('Nickname is required');
+    return;
+  }
+  if (!socket || !socket.connected) {
+    socket = io({ transports: ['websocket'] });
+    bindSocketEvents();
+  }
+  socket.once('connect', () => {
+    socket.emit('join-lobby', { pin: savedPin, nickname });
+  });
+  if (socket.connected) {
+    socket.emit('join-lobby', { pin: savedPin, nickname });
+  }
+}
+
+function showNicknameError(msg) {
+  const el = document.getElementById('nickname-error');
+  el.textContent = msg;
+  el.classList.remove('hidden');
+}
+
+// ── Socket events ─────────────────────────────────────────────────────────────
+
+function bindSocketEvents() {
+  socket.on('join-error', ({ message }) => {
+    if (document.getElementById('screen-nickname').classList.contains('active')) {
+      showNicknameError(message);
+    } else {
+      showPinError(message);
+    }
+  });
+
+  socket.on('join-success', ({ playerId, nickname, playerCount }) => {
+    savedPlayerId = playerId;
+    savedNickname = nickname;
+    document.getElementById('lobby-count').textContent = playerCount;
+    showScreen('screen-lobby');
+  });
+
+  socket.on('lobby-update', ({ players, playerCount }) => {
+    document.getElementById('lobby-count').textContent = playerCount;
+    updateLobbyChips(players);
+  });
+
+  socket.on('question-start', (data) => {
+    // Clear any confetti from previous round
+    document.querySelectorAll('.confetti-piece').forEach(el => el.remove());
+
+    document.getElementById('q-progress').textContent =
+      `Q ${data.questionIndex + 1} / ${data.totalQuestions}`;
+    document.getElementById('q-text').textContent = data.text;
+    data.options.forEach((opt, i) => {
+      document.querySelector(`.opt-label[data-index="${i}"]`).textContent = opt;
+    });
+
+    // Reset tiles
+    document.querySelectorAll('.answer-tile').forEach(tile => {
+      tile.classList.remove('disabled', 'selected');
+    });
+
+    showScreen('screen-question');
+    document.getElementById('feedback-waiting').classList.add('hidden');
+  });
+
+  socket.on('answer-accepted', () => {
+    lockTiles();
+  });
+
+  socket.on('answer-locked', () => {
+    lockTiles();
+  });
+
+  socket.on('question-reveal', (data) => {
+    const myResult = data.playerResults && data.playerResults[savedNickname];
+    const isCorrect = myResult ? myResult.correct : false;
+    const newScore = myResult ? myResult.newScore : currentScore;
+    const oldScore = currentScore;
+    currentScore = newScore;
+
+    // Feedback icon
+    document.getElementById('feedback-icon').textContent = isCorrect ? '✅' : '❌';
+    document.getElementById('feedback-icon').style.animation = 'none';
+    void document.getElementById('feedback-icon').offsetWidth; // reflow
+    document.getElementById('feedback-icon').style.animation = '';
+    document.getElementById('feedback-icon').classList.add('spring-in');
+
+    document.getElementById('feedback-result').textContent = isCorrect
+      ? `+${myResult.pointsEarned} points!` : 'Not this time…';
+
+    // Animate score counter
+    animateCounter(
+      document.getElementById('feedback-score'),
+      oldScore, newScore, 800
+    );
+
+    if (isCorrect) spawnConfetti();
+
+    // Rank
+    document.getElementById('feedback-rank').textContent = '';
+    document.getElementById('feedback-waiting').classList.add('hidden');
+    setTimeout(() => {
+      document.getElementById('feedback-waiting').classList.remove('hidden');
+    }, 1500);
+
+    showScreen('screen-feedback');
+  });
+
+  socket.on('leaderboard-update', (data) => {
+    const myEntry = data.leaderboard.find(p => p.nickname === savedNickname);
+    if (myEntry) {
+      document.getElementById('feedback-rank').textContent =
+        `Rank ${myEntry.rank} of ${data.leaderboard.length}`;
+    }
+  });
+
+  socket.on('game-ended', (data) => {
+    const myEntry = data.allPlayers.find(p => p.nickname === savedNickname);
+    document.getElementById('ended-score').textContent = currentScore;
+    if (myEntry) {
+      document.getElementById('ended-rank').textContent =
+        `Final Rank: ${myEntry.rank} of ${data.allPlayers.length}`;
+    }
+    showScreen('screen-ended');
+  });
+
+  socket.on('disconnect', () => {
+    // Reconnect handled automatically by socket.io
+  });
+}
+
+// ── Tile tap handling ─────────────────────────────────────────────────────────
+
+document.querySelectorAll('.answer-tile').forEach(tile => {
+  tile.addEventListener('click', () => {
+    const idx = Number(tile.dataset.index);
+    lockTiles();
+    tile.classList.add('selected');
+    socket.emit('submit-answer', { optionIndex: idx });
+  });
+});
+
+function lockTiles() {
+  document.querySelectorAll('.answer-tile').forEach(t => t.classList.add('disabled'));
+}
+
+// ── Lobby chips ───────────────────────────────────────────────────────────────
+
+function updateLobbyChips(players) {
+  const el = document.querySelector('#screen-lobby .chip-grid');
+  el.innerHTML = players.map(p => `
+    <span class="chip-pop bg-white/25 text-white font-black px-3 py-2 rounded-full text-sm">
+      ${esc(p.nickname)}
+    </span>
+  `).join('');
+}
+
+// ── Confetti ──────────────────────────────────────────────────────────────────
+
+function spawnConfetti() {
+  for (let i = 0; i < 30; i++) {
+    const el = document.createElement('div');
+    el.classList.add('confetti-piece');
+    el.style.setProperty('--x', `${Math.random() * 100}vw`);
+    el.style.setProperty('--color', CONFETTI_COLORS[Math.floor(Math.random() * CONFETTI_COLORS.length)]);
+    el.style.setProperty('--duration', `${1.5 + Math.random() * 2}s`);
+    el.style.setProperty('--delay', `${Math.random() * 0.8}s`);
+    document.body.appendChild(el);
+    el.addEventListener('animationend', () => el.remove());
+  }
+}
+
+// ── Animated score counter ────────────────────────────────────────────────────
+
+function animateCounter(el, from, to, duration) {
+  const startTime = performance.now();
+  el.textContent = from;
+  el.classList.remove('count-bounce');
+  void el.offsetWidth;
+  el.classList.add('count-bounce');
+
+  function tick(now) {
+    const elapsed = now - startTime;
+    const progress = Math.min(elapsed / duration, 1);
+    el.textContent = Math.round(from + (to - from) * progress);
+    if (progress < 1) requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+}
+
+// ── Utilities ─────────────────────────────────────────────────────────────────
+
+function esc(str) {
+  return String(str ?? '')
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;');
+}
+
+// ── Init ─────────────────────────────────────────────────────────────────────
+
+// Pre-fill PIN from URL if provided
+const pinParam = new URLSearchParams(location.search).get('pin');
+if (pinParam) {
+  document.getElementById('pin-input').value = pinParam;
+}
+</script>
+</body>
+</html>

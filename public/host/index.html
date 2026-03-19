@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Host Panel · Quiz Platform</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;900&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="/shared.css">
+  <script src="/socket.io/socket.io.js"></script>
+  <style>
+    [x-cloak] { display: none !important; }
+    .bar-fill { height: 100%; border-radius: 4px; transition: width 0.8s ease-out; }
+  </style>
+</head>
+<body class="gradient-bg min-h-screen">
+
+<!-- ── LIBRARY PANEL ──────────────────────────────────────────────────────── -->
+<div id="panel-library" class="max-w-4xl mx-auto p-6">
+  <div class="flex items-center justify-between mb-6">
+    <h1 class="text-3xl font-black">🎮 Your Quizzes</h1>
+    <div class="flex gap-3">
+      <button id="btn-new-quiz"
+        class="bg-white text-purple-800 font-black px-5 py-2 rounded-xl hover:bg-purple-50 transition-colors">
+        ＋ New Quiz
+      </button>
+      <form method="POST" action="/host/logout" style="display:inline">
+        <button type="submit" class="bg-white/20 hover:bg-white/30 text-white font-bold px-4 py-2 rounded-xl transition-colors">
+          Sign Out
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- New quiz form (hidden by default) -->
+  <div id="new-quiz-form" class="hidden bg-white/10 backdrop-blur rounded-2xl p-5 mb-5">
+    <h2 class="text-lg font-black mb-3">Create New Quiz</h2>
+    <div class="flex gap-3">
+      <input id="new-quiz-name" type="text" maxlength="100" placeholder="Quiz name…"
+        class="flex-1 rounded-xl px-4 py-2 text-gray-800 font-bold focus:outline-none focus:ring-2 focus:ring-white">
+      <button id="btn-create-quiz"
+        class="bg-white text-purple-800 font-black px-5 py-2 rounded-xl hover:bg-purple-50 transition-colors">
+        Create
+      </button>
+      <button id="btn-cancel-new-quiz"
+        class="bg-white/20 text-white font-bold px-4 py-2 rounded-xl hover:bg-white/30 transition-colors">
+        Cancel
+      </button>
+    </div>
+    <p id="new-quiz-error" class="hidden text-red-300 text-sm mt-2 font-bold"></p>
+  </div>
+
+  <!-- Quiz list -->
+  <div id="quiz-list" class="space-y-4">
+    <!-- Populated by JS -->
+  </div>
+</div>
+
+<!-- ── GAME PANEL ─────────────────────────────────────────────────────────── -->
+<div id="panel-game" class="hidden max-w-5xl mx-auto p-6">
+  <div class="grid grid-cols-3 gap-6 h-screen max-h-[calc(100vh-48px)]">
+
+    <!-- Left: status sidebar -->
+    <div class="col-span-1 flex flex-col gap-4">
+      <div class="bg-white/10 backdrop-blur rounded-2xl p-4">
+        <div class="text-xs font-bold text-white/60 uppercase tracking-wide mb-1">Session PIN</div>
+        <div id="game-pin" class="text-5xl font-black tracking-widest font-mono text-center py-2">——</div>
+        <img id="qr-img" src="" alt="QR Code" class="w-32 h-32 mx-auto rounded-xl mt-2">
+      </div>
+      <div class="bg-white/10 backdrop-blur rounded-2xl p-4 flex-1">
+        <div class="text-xs font-bold text-white/60 uppercase tracking-wide mb-2">Players</div>
+        <div id="player-count" class="text-3xl font-black">0</div>
+        <div id="player-chips" class="flex flex-wrap gap-2 mt-3 max-h-48 overflow-y-auto"></div>
+      </div>
+      <div class="bg-white/10 backdrop-blur rounded-2xl p-4">
+        <div id="leaderboard-sidebar" class="space-y-1">
+          <div class="text-xs font-bold text-white/60 uppercase tracking-wide mb-2">Leaderboard</div>
+          <p class="text-white/40 text-sm">Starts after first reveal</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Center: main stage -->
+    <div class="col-span-2 flex flex-col gap-4">
+      <div class="bg-white/10 backdrop-blur rounded-2xl p-5 flex-1 flex flex-col">
+        <div class="flex items-center gap-4 mb-4">
+          <span id="phase-badge" class="bg-white/20 px-3 py-1 rounded-full text-sm font-bold uppercase tracking-wide">Lobby</span>
+          <span id="question-progress" class="text-white/60 text-sm font-bold"></span>
+        </div>
+
+        <!-- Question text & tally bars -->
+        <div id="question-display" class="flex-1 flex flex-col justify-center">
+          <p class="text-white/50 text-center font-bold text-lg">Waiting for players to join…</p>
+        </div>
+
+        <!-- Tally bars (hidden until question active) -->
+        <div id="tally-bars" class="hidden grid grid-cols-2 gap-3 mt-4">
+          <div class="bg-red-600 rounded-xl p-3">
+            <div class="flex items-center gap-2 mb-1">
+              <span class="text-xl">▲</span>
+              <span id="opt-text-0" class="text-sm font-bold truncate flex-1"></span>
+              <span id="tally-count-0" class="text-sm font-black">0</span>
+            </div>
+            <div class="bg-white/20 rounded-full h-3">
+              <div id="tally-bar-0" class="bar-fill bg-white" style="width:0%"></div>
+            </div>
+          </div>
+          <div class="bg-blue-600 rounded-xl p-3" style="background:#1368CE">
+            <div class="flex items-center gap-2 mb-1">
+              <span class="text-xl">◆</span>
+              <span id="opt-text-1" class="text-sm font-bold truncate flex-1"></span>
+              <span id="tally-count-1" class="text-sm font-black">0</span>
+            </div>
+            <div class="bg-white/20 rounded-full h-3">
+              <div id="tally-bar-1" class="bar-fill bg-white" style="width:0%"></div>
+            </div>
+          </div>
+          <div class="rounded-xl p-3" style="background:#D89E00">
+            <div class="flex items-center gap-2 mb-1">
+              <span class="text-xl">●</span>
+              <span id="opt-text-2" class="text-sm font-bold truncate flex-1"></span>
+              <span id="tally-count-2" class="text-sm font-black">0</span>
+            </div>
+            <div class="bg-white/20 rounded-full h-3">
+              <div id="tally-bar-2" class="bar-fill bg-white" style="width:0%"></div>
+            </div>
+          </div>
+          <div class="rounded-xl p-3" style="background:#26890C">
+            <div class="flex items-center gap-2 mb-1">
+              <span class="text-xl">■</span>
+              <span id="opt-text-3" class="text-sm font-bold truncate flex-1"></span>
+              <span id="tally-count-3" class="text-sm font-black">0</span>
+            </div>
+            <div class="bg-white/20 rounded-full h-3">
+              <div id="tally-bar-3" class="bar-fill bg-white" style="width:0%"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Action buttons -->
+      <div id="action-area" class="flex gap-3">
+        <button id="btn-primary-action"
+          class="flex-1 bg-white text-purple-800 font-black text-lg rounded-2xl py-4 hover:bg-purple-50 transition-colors shadow-lg">
+          Start First Question
+        </button>
+        <button id="btn-end-game"
+          class="hidden bg-white/20 text-white font-bold px-6 rounded-2xl hover:bg-white/30 transition-colors">
+          End Game
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ════════════════════════════════════════════════════════════════════════════
+   Host Panel JS
+   ════════════════════════════════════════════════════════════════════════════ */
+
+const SHAPES  = ['▲', '◆', '●', '■'];
+const COLORS  = ['#E21B3C', '#1368CE', '#D89E00', '#26890C'];
+
+let socket = null;
+let activePin = null;
+let currentQuizName = '';
+let currentStatus = 'lobby';
+let currentQuestionIndex = -1;
+let currentQuestionTotal = 0;
+let currentOptions = [];
+
+// ── Panels ────────────────────────────────────────────────────────────────────
+
+function showPanel(name) {
+  document.getElementById('panel-library').classList.toggle('hidden', name !== 'library');
+  document.getElementById('panel-game').classList.toggle('hidden', name !== 'game');
+}
+
+// ── Library ───────────────────────────────────────────────────────────────────
+
+async function loadQuizzes() {
+  const res = await fetch('/host/api/quizzes');
+  const quizzes = await res.json();
+  renderQuizList(quizzes);
+}
+
+function renderQuizList(quizzes) {
+  const el = document.getElementById('quiz-list');
+  if (!quizzes.length) {
+    el.innerHTML = `
+      <div class="bg-white/10 backdrop-blur rounded-2xl p-8 text-center">
+        <div class="text-4xl mb-3">📝</div>
+        <p class="font-bold text-white/70">No quizzes yet. Create your first one!</p>
+      </div>`;
+    return;
+  }
+
+  el.innerHTML = quizzes.map(q => `
+    <div class="quiz-card bg-white/10 backdrop-blur rounded-2xl p-5" data-id="${q.id}">
+      <div class="flex items-center gap-3 mb-3">
+        <div class="flex-1">
+          <div class="quiz-name-display flex items-center gap-2">
+            <h2 class="text-xl font-black">${esc(q.name)}</h2>
+            <button onclick="startRenameQuiz(${q.id})"
+              class="text-white/50 hover:text-white text-sm transition-colors">✎</button>
+          </div>
+          <div class="quiz-rename-form hidden flex gap-2 mt-1">
+            <input class="rename-input flex-1 rounded-lg px-3 py-1 text-gray-800 font-bold text-sm focus:outline-none"
+              value="${esc(q.name)}" maxlength="100">
+            <button onclick="submitRenameQuiz(${q.id})" class="bg-white text-purple-700 font-bold text-sm px-3 py-1 rounded-lg">Save</button>
+            <button onclick="cancelRenameQuiz(${q.id})" class="bg-white/20 text-white text-sm px-2 py-1 rounded-lg">✕</button>
+          </div>
+        </div>
+        <span class="bg-white/20 text-sm font-bold px-3 py-1 rounded-full">
+          ${q.question_count} Q${q.question_count !== 1 ? 's' : ''}
+        </span>
+        <button onclick="startSession(${q.id}, '${esc(q.name)}')"
+          ${q.question_count === 0 ? 'disabled title="Add at least one question first"' : ''}
+          class="bg-white text-purple-800 font-black px-4 py-2 rounded-xl hover:bg-purple-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+          ▶ Start
+        </button>
+        <button onclick="deleteQuiz(${q.id})"
+          class="text-white/40 hover:text-red-300 text-xl transition-colors px-2">🗑</button>
+      </div>
+
+      <!-- Question list (load on expand) -->
+      <div class="question-list mt-3 space-y-2" data-quiz-id="${q.id}"></div>
+      <button onclick="toggleQuizExpand(${q.id}, this)"
+        class="text-white/60 hover:text-white text-sm font-bold transition-colors mt-2">
+        ▾ Show Questions
+      </button>
+    </div>
+  `).join('');
+}
+
+async function toggleQuizExpand(quizId, btn) {
+  const container = document.querySelector(`.question-list[data-quiz-id="${quizId}"]`);
+  if (container.dataset.loaded) {
+    container.classList.toggle('hidden');
+    btn.textContent = container.classList.contains('hidden') ? '▾ Show Questions' : '▴ Hide Questions';
+    return;
+  }
+  const res = await fetch(`/host/api/quizzes/${quizId}`);
+  const quiz = await res.json();
+  container.dataset.loaded = '1';
+  renderQuestions(quizId, quiz.questions);
+  btn.textContent = '▴ Hide Questions';
+}
+
+function renderQuestions(quizId, questions) {
+  const container = document.querySelector(`.question-list[data-quiz-id="${quizId}"]`);
+  const addBtn = `
+    <button onclick="showAddQuestionForm(${quizId})"
+      class="w-full bg-white/10 hover:bg-white/20 text-white font-bold py-2 rounded-xl text-sm transition-colors mt-2">
+      ＋ Add Question
+    </button>
+    <div id="add-q-form-${quizId}" class="hidden"></div>
+  `;
+
+  if (!questions.length) {
+    container.innerHTML = `<p class="text-white/40 text-sm">No questions yet.</p>` + addBtn;
+    return;
+  }
+
+  const TILE_LABELS = [
+    { shape: '▲', color: '#E21B3C', label: 'Red' },
+    { shape: '◆', color: '#1368CE', label: 'Blue' },
+    { shape: '●', color: '#D89E00', label: 'Yellow' },
+    { shape: '■', color: '#26890C', label: 'Green' },
+  ];
+
+  container.innerHTML = questions.map((q, i) => `
+    <div class="bg-white/10 rounded-xl p-4" id="question-row-${q.id}">
+      <div class="question-view-${q.id}">
+        <div class="flex items-start gap-2">
+          <span class="bg-white/20 rounded-full w-6 h-6 flex items-center justify-center text-xs font-black flex-shrink-0">${i+1}</span>
+          <div class="flex-1 min-w-0">
+            <p class="font-bold text-sm">${esc(q.text)}</p>
+            <p class="text-xs text-white/50 mt-1">⏱ ${q.time_limit_seconds}s &nbsp;·&nbsp; ✓ ${TILE_LABELS[q.correct_index].shape} ${esc(q.options[q.correct_index])}</p>
+          </div>
+          <div class="flex gap-1 flex-shrink-0">
+            <button onclick="showEditQuestionForm(${quizId}, ${q.id})"
+              class="text-white/50 hover:text-white text-sm px-2 py-1 rounded transition-colors">✎</button>
+            <button onclick="deleteQuestion(${quizId}, ${q.id})"
+              class="text-white/50 hover:text-red-300 text-sm px-2 py-1 rounded transition-colors">🗑</button>
+          </div>
+        </div>
+      </div>
+      <div class="question-edit-form-${q.id} hidden"></div>
+    </div>
+  `).join('') + addBtn;
+}
+
+function _questionFormHTML(quizId, qData = null) {
+  const isEdit = qData !== null;
+  const v = qData || { text: '', options: ['','','',''], correct_index: 0, time_limit_seconds: 20 };
+  const TILE_CLASSES = ['bg-red-600', 'bg-blue-600', '', ''];
+  const TILE_COLORS = ['#E21B3C','#1368CE','#D89E00','#26890C'];
+  const TILE_LABELS = ['Red ▲','Blue ◆','Yellow ●','Green ■'];
+
+  return `
+    <div class="bg-white/5 rounded-xl p-4 mt-2 space-y-3">
+      <div>
+        <label class="text-xs text-white/60 font-bold">Question</label>
+        <textarea class="qf-text w-full mt-1 rounded-lg px-3 py-2 text-gray-800 font-bold text-sm focus:outline-none resize-none" rows="2" maxlength="300">${esc(v.text)}</textarea>
+      </div>
+      <div class="grid grid-cols-2 gap-2">
+        ${[0,1,2,3].map(i => `
+          <div class="rounded-lg p-2" style="background:${TILE_COLORS[i]}">
+            <label class="text-xs text-white/80 font-bold">${TILE_LABELS[i]}</label>
+            <input class="qf-opt-${i} w-full mt-1 rounded px-2 py-1 text-gray-800 font-bold text-sm focus:outline-none" type="text" maxlength="90" value="${esc((v.options||[])[i]||'')}">
+          </div>
+        `).join('')}
+      </div>
+      <div class="flex gap-4 flex-wrap">
+        <div>
+          <label class="text-xs text-white/60 font-bold">Correct Answer</label>
+          <select class="qf-correct mt-1 rounded-lg px-3 py-2 text-gray-800 font-bold text-sm focus:outline-none">
+            ${[0,1,2,3].map(i=>`<option value="${i}" ${v.correct_index===i?'selected':''}>${TILE_LABELS[i]}</option>`).join('')}
+          </select>
+        </div>
+        <div>
+          <label class="text-xs text-white/60 font-bold">Time (seconds)</label>
+          <input class="qf-time mt-1 w-24 rounded-lg px-3 py-2 text-gray-800 font-bold text-sm focus:outline-none" type="number" min="5" max="120" value="${v.time_limit_seconds}">
+        </div>
+      </div>
+      <p class="qf-error hidden text-red-300 text-xs font-bold"></p>
+      <div class="flex gap-2">
+        <button class="qf-save bg-white text-purple-800 font-black px-4 py-2 rounded-xl text-sm hover:bg-purple-50 transition-colors">Save Question</button>
+        <button class="qf-cancel bg-white/20 text-white font-bold px-3 py-2 rounded-xl text-sm hover:bg-white/30 transition-colors">Cancel</button>
+      </div>
+    </div>
+  `;
+}
+
+function showAddQuestionForm(quizId) {
+  const el = document.getElementById(`add-q-form-${quizId}`);
+  el.innerHTML = _questionFormHTML(quizId);
+  el.classList.remove('hidden');
+  el.querySelector('.qf-save').onclick = () => submitAddQuestion(quizId, el);
+  el.querySelector('.qf-cancel').onclick = () => { el.innerHTML=''; el.classList.add('hidden'); };
+}
+
+async function submitAddQuestion(quizId, formEl) {
+  const payload = _readQuestionForm(formEl);
+  if (!payload) return;
+  const res = await fetch(`/host/api/quizzes/${quizId}/questions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    formEl.querySelector('.qf-error').textContent = err.error;
+    formEl.querySelector('.qf-error').classList.remove('hidden');
+    return;
+  }
+  await reloadQuizCard(quizId);
+}
+
+function showEditQuestionForm(quizId, questionId) {
+  fetch(`/host/api/quizzes/${quizId}`).then(r=>r.json()).then(quiz => {
+    const q = quiz.questions.find(q => q.id === questionId);
+    if (!q) return;
+    const editEl = document.querySelector(`.question-edit-form-${questionId}`);
+    const viewEl = document.querySelector(`.question-view-${questionId}`);
+    editEl.innerHTML = _questionFormHTML(quizId, q);
+    editEl.classList.remove('hidden');
+    viewEl.classList.add('hidden');
+    editEl.querySelector('.qf-save').onclick = () => submitEditQuestion(quizId, questionId, editEl, viewEl);
+    editEl.querySelector('.qf-cancel').onclick = () => { editEl.innerHTML=''; editEl.classList.add('hidden'); viewEl.classList.remove('hidden'); };
+  });
+}
+
+async function submitEditQuestion(quizId, questionId, formEl, viewEl) {
+  const payload = _readQuestionForm(formEl);
+  if (!payload) return;
+  const res = await fetch(`/host/api/questions/${questionId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text: payload.text, options: payload.options, correct_index: payload.correctIndex, time_limit_seconds: payload.timeLimitSeconds }),
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    formEl.querySelector('.qf-error').textContent = err.error;
+    formEl.querySelector('.qf-error').classList.remove('hidden');
+    return;
+  }
+  await reloadQuizCard(quizId);
+}
+
+function _readQuestionForm(formEl) {
+  const text = formEl.querySelector('.qf-text').value.trim();
+  const options = [0,1,2,3].map(i => formEl.querySelector(`.qf-opt-${i}`).value.trim());
+  const correctIndex = Number(formEl.querySelector('.qf-correct').value);
+  const timeLimitSeconds = Number(formEl.querySelector('.qf-time').value);
+  const errEl = formEl.querySelector('.qf-error');
+
+  if (!text) { errEl.textContent = 'Question text is required'; errEl.classList.remove('hidden'); return null; }
+  if (options.some(o => !o)) { errEl.textContent = '4 answer options are required'; errEl.classList.remove('hidden'); return null; }
+  if (timeLimitSeconds < 5 || timeLimitSeconds > 120) { errEl.textContent = 'Time must be 5–120 seconds'; errEl.classList.remove('hidden'); return null; }
+  errEl.classList.add('hidden');
+  return { text, options, correctIndex, timeLimitSeconds };
+}
+
+async function deleteQuestion(quizId, questionId) {
+  if (!confirm('Delete this question?')) return;
+  await fetch(`/host/api/questions/${questionId}`, { method: 'DELETE' });
+  await reloadQuizCard(quizId);
+}
+
+async function reloadQuizCard(quizId) {
+  await loadQuizzes();
+  // Re-expand questions for this quiz
+  const container = document.querySelector(`.question-list[data-quiz-id="${quizId}"]`);
+  if (container) {
+    const res = await fetch(`/host/api/quizzes/${quizId}`);
+    const quiz = await res.json();
+    container.dataset.loaded = '1';
+    renderQuestions(quizId, quiz.questions);
+    container.classList.remove('hidden');
+  }
+}
+
+function startRenameQuiz(quizId) {
+  const card = document.querySelector(`.quiz-card[data-id="${quizId}"]`);
+  card.querySelector('.quiz-name-display').classList.add('hidden');
+  card.querySelector('.quiz-rename-form').classList.remove('hidden');
+}
+function cancelRenameQuiz(quizId) {
+  const card = document.querySelector(`.quiz-card[data-id="${quizId}"]`);
+  card.querySelector('.quiz-name-display').classList.remove('hidden');
+  card.querySelector('.quiz-rename-form').classList.add('hidden');
+}
+async function submitRenameQuiz(quizId) {
+  const card = document.querySelector(`.quiz-card[data-id="${quizId}"]`);
+  const name = card.querySelector('.rename-input').value.trim();
+  if (!name) return;
+  await fetch(`/host/api/quizzes/${quizId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name }),
+  });
+  await loadQuizzes();
+}
+
+async function deleteQuiz(quizId) {
+  if (!confirm('Delete this quiz and all its questions?')) return;
+  await fetch(`/host/api/quizzes/${quizId}`, { method: 'DELETE' });
+  await loadQuizzes();
+}
+
+// ── New quiz ──────────────────────────────────────────────────────────────────
+
+document.getElementById('btn-new-quiz').onclick = () => {
+  document.getElementById('new-quiz-form').classList.toggle('hidden');
+  document.getElementById('new-quiz-name').focus();
+};
+document.getElementById('btn-cancel-new-quiz').onclick = () => {
+  document.getElementById('new-quiz-form').classList.add('hidden');
+};
+document.getElementById('btn-create-quiz').onclick = async () => {
+  const name = document.getElementById('new-quiz-name').value.trim();
+  if (!name) { showNewQuizError('Name is required'); return; }
+  const res = await fetch('/host/api/quizzes', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name }),
+  });
+  if (!res.ok) { const e = await res.json(); showNewQuizError(e.error); return; }
+  document.getElementById('new-quiz-form').classList.add('hidden');
+  document.getElementById('new-quiz-name').value = '';
+  await loadQuizzes();
+};
+function showNewQuizError(msg) {
+  const el = document.getElementById('new-quiz-error');
+  el.textContent = msg;
+  el.classList.remove('hidden');
+}
+
+// ── Start session ─────────────────────────────────────────────────────────────
+
+async function startSession(quizId, quizName) {
+  const res = await fetch('/host/api/session/start', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ quizId }),
+  });
+  if (!res.ok) { const e = await res.json(); alert(e.error); return; }
+  const data = await res.json();
+  activePin = data.pin;
+  currentQuizName = quizName;
+  currentStatus = 'lobby';
+  currentQuestionIndex = -1;
+  currentQuestionTotal = data.questionCount;
+
+  document.getElementById('game-pin').textContent = data.pin;
+  const qrImg = document.getElementById('qr-img');
+  qrImg.src = data.qrDataUrl;
+  qrImg.alt = `Join at ${data.pin}`;
+  document.getElementById('phase-badge').textContent = 'Lobby';
+  document.getElementById('question-progress').textContent = '';
+  document.getElementById('question-display').innerHTML =
+    `<p class="font-bold text-white/50 text-center text-lg">Waiting for players to join…</p>`;
+  document.getElementById('tally-bars').classList.add('hidden');
+  document.getElementById('btn-primary-action').textContent = 'Start First Question';
+  document.getElementById('btn-end-game').classList.remove('hidden');
+  document.getElementById('leaderboard-sidebar').innerHTML =
+    `<div class="text-xs font-bold text-white/60 uppercase tracking-wide mb-2">Leaderboard</div>
+     <p class="text-white/40 text-sm">Starts after first reveal</p>`;
+
+  showPanel('game');
+  _connectSocket();
+}
+
+// ── Socket.io ─────────────────────────────────────────────────────────────────
+
+function _connectSocket() {
+  if (socket) socket.disconnect();
+  socket = io({ transports: ['websocket'] });
+
+  socket.on('connect', () => {
+    socket.emit('host-join', { pin: activePin });
+  });
+
+  socket.on('host-state', (data) => {
+    if (data.players) updatePlayerChips(data.players);
+  });
+
+  socket.on('lobby-update', (data) => {
+    document.getElementById('player-count').textContent = data.playerCount;
+    updatePlayerChips(data.players);
+  });
+
+  socket.on('question-start', (data) => {
+    currentStatus = 'question';
+    currentQuestionIndex = data.questionIndex;
+    currentOptions = data.options;
+    document.getElementById('phase-badge').textContent = 'Question';
+    document.getElementById('question-progress').textContent =
+      `Q ${data.questionIndex + 1} / ${data.totalQuestions}`;
+    document.getElementById('question-display').innerHTML =
+      `<p class="text-2xl font-black text-center leading-snug">${esc(data.text)}</p>`;
+
+    // Populate tally bars
+    const bars = document.getElementById('tally-bars');
+    bars.classList.remove('hidden');
+    for (let i = 0; i < 4; i++) {
+      document.getElementById(`opt-text-${i}`).textContent = data.options[i] || '';
+      document.getElementById(`tally-count-${i}`).textContent = '0';
+      document.getElementById(`tally-bar-${i}`).style.width = '0%';
+    }
+
+    document.getElementById('btn-primary-action').textContent = 'Reveal ✓';
+    document.getElementById('btn-end-game').classList.remove('hidden');
+  });
+
+  socket.on('answer-tally-update', (data) => {
+    const max = Math.max(1, ...data.tally);
+    for (let i = 0; i < 4; i++) {
+      document.getElementById(`tally-count-${i}`).textContent = data.tally[i];
+      document.getElementById(`tally-bar-${i}`).style.width = `${(data.tally[i] / max) * 100}%`;
+    }
+  });
+
+  socket.on('question-reveal', (data) => {
+    currentStatus = 'reveal';
+    document.getElementById('phase-badge').textContent = 'Reveal';
+    // Highlight correct bar
+    for (let i = 0; i < 4; i++) {
+      const bar = document.getElementById(`tally-bar-${i}`);
+      if (i === data.correctIndex) {
+        bar.closest('div.rounded-xl').style.outline = '3px solid #fff';
+      }
+    }
+    document.getElementById('btn-primary-action').textContent = 'Next →';
+  });
+
+  socket.on('leaderboard-update', (data) => {
+    currentStatus = 'leaderboard';
+    document.getElementById('phase-badge').textContent = 'Leaderboard';
+    document.getElementById('btn-primary-action').textContent = 'Next Question';
+    renderLeaderboardSidebar(data.leaderboard);
+  });
+
+  socket.on('game-ended', (data) => {
+    currentStatus = 'ended';
+    document.getElementById('phase-badge').textContent = 'Ended 🏆';
+    document.getElementById('btn-primary-action').textContent = 'Back to Quizzes';
+    document.getElementById('btn-end-game').classList.add('hidden');
+    document.getElementById('question-display').innerHTML = _renderPodium(data.podium);
+    renderLeaderboardSidebar(data.allPlayers);
+  });
+
+  socket.on('error', (data) => console.error('Socket error:', data));
+}
+
+function updatePlayerChips(players) {
+  const el = document.getElementById('player-chips');
+  document.getElementById('player-count').textContent = players.length;
+  el.innerHTML = players.map(p => `
+    <span class="chip-pop bg-white/25 text-white text-sm font-bold px-3 py-1 rounded-full">
+      ${esc(p.nickname)}
+    </span>
+  `).join('');
+}
+
+function renderLeaderboardSidebar(list) {
+  if (!list || !list.length) return;
+  const el = document.getElementById('leaderboard-sidebar');
+  el.innerHTML = `<div class="text-xs font-bold text-white/60 uppercase tracking-wide mb-2">Leaderboard</div>` +
+    list.slice(0, 10).map((p, i) => `
+      <div class="flex items-center gap-2 py-1 stagger-slide" style="animation-delay:${i*80}ms">
+        <span class="text-white/50 font-black w-6 text-right text-sm">${p.rank || i+1}</span>
+        <span class="flex-1 font-bold text-sm truncate">${esc(p.nickname)}</span>
+        <span class="font-black text-sm">${p.score}</span>
+      </div>
+    `).join('');
+}
+
+function _renderPodium(podium) {
+  if (!podium || !podium.length) return `<p class="text-center font-bold text-white/60">No players finished.</p>`;
+  const maxScore = Math.max(...podium.map(p => p.score), 1);
+  const heights = podium.map(p => Math.round((p.score / maxScore) * 150 + 50));
+  const orderMap = { 0: 1, 1: 0, 2: 2 }; // 2nd, 1st, 3rd
+  const delays  = [0.6, 1.0, 0.3];
+  const podiumColors = ['#8B2FC9','#F5C518','#9E9E9E'];
+  return `
+    <div class="flex items-end justify-center gap-6 pt-6">
+      ${podium.slice(0, 3).map((p, i) => {
+        const pos = orderMap[i] ?? i;
+        return `
+          <div class="flex flex-col items-center" style="order:${pos}">
+            <p class="font-black mb-2 text-center text-sm">${esc(p.nickname)}</p>
+            <p class="text-lg font-black mb-1">${p.score}</p>
+            <div class="pillar w-20 pillar-rise flex items-end justify-center pb-2 text-2xl font-black"
+              style="height:${heights[i]}px; background:${podiumColors[i]}; animation-delay:${delays[i]}s">
+              ${['🥇','🥈','🥉'][i]}
+            </div>
+          </div>
+        `;
+      }).join('')}
+    </div>
+  `;
+}
+
+// ── Primary action button ─────────────────────────────────────────────────────
+
+document.getElementById('btn-primary-action').onclick = async () => {
+  if (currentStatus === 'ended') {
+    showPanel('library');
+    socket && socket.disconnect();
+    socket = null;
+    activePin = null;
+    await loadQuizzes();
+    return;
+  }
+  await fetch('/host/api/session/next', { method: 'POST' });
+};
+
+document.getElementById('btn-end-game').onclick = async () => {
+  if (!confirm('End the game now?')) return;
+  await fetch('/host/api/session/end', { method: 'POST' });
+};
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function esc(str) {
+  return String(str ?? '')
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;')
+    .replace(/'/g,'&#x27;');
+}
+
+// ── Init ───────────────────────────────────────────────────────────────────────
+loadQuizzes();
+</script>
+</body>
+</html>
