@@ -752,8 +752,8 @@ function showSettingsTab(tab) {
 }
 
 async function loadSettingsPanel() {
-  showSettingsTab('general');
   try {
+    showSettingsTab('general');
     const res = await apiFetch('/host/api/settings');
     if (!res.ok) return;
     const s = await res.json();
@@ -903,11 +903,14 @@ async function toggleQuizExpand(quizId, btn) {
     btn.textContent = container.classList.contains('hidden') ? t('host.show_questions') : t('host.hide_questions');
     return;
   }
-  const res = await apiFetch(`/host/api/quizzes/${quizId}`);
-  const quiz = await res.json();
-  container.dataset.loaded = '1';
-  renderQuestions(quizId, quiz.questions);
-  btn.textContent = t('host.hide_questions');
+  try {
+    const res = await apiFetch(`/host/api/quizzes/${quizId}`);
+    if (!res.ok) { console.error('Failed to load quiz:', res.status); return; }
+    const quiz = await res.json();
+    container.dataset.loaded = '1';
+    renderQuestions(quizId, quiz.questions || []);
+    btn.textContent = t('host.hide_questions');
+  } catch (e) { console.error('toggleQuizExpand error:', e); }
 }
 
 function renderQuestions(quizId, questions) {
@@ -1184,9 +1187,11 @@ async function duplicateQuiz(quizId) {
 
 async function loadHistory() {
   document.getElementById('history-list').innerHTML = `<p class="text-white/40 font-bold text-center py-8">${t('host.loading')}</p>`;
+  try {
   const res = await apiFetch('/host/api/sessions');
+  if (!res.ok) { console.error('Failed to load history:', res.status); return; }
   const sessions = await res.json();
-  if (!sessions.length) {
+  if (!Array.isArray(sessions) || !sessions.length) {
     document.getElementById('history-list').innerHTML = `<p class="text-white/40 font-bold text-center py-8">${t('host.no_sessions')}</p>`;
     return;
   }
@@ -1208,6 +1213,7 @@ async function loadHistory() {
       <div id="session-detail-${s.id}" class="hidden mt-3"></div>
     </div>
   `).join('');
+  } catch (e) { console.error('loadHistory error:', e); }
 }
 
 async function toggleSessionDetail(sessionId, btn) {

@@ -46,6 +46,7 @@ app.use(helmet({
     directives: {
       defaultSrc:     ["'self'"],
       scriptSrc:      ["'self'", "'unsafe-inline'", 'https://cdn.tailwindcss.com'],
+      scriptSrcAttr:  ["'unsafe-inline'"],
       styleSrc:       ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
       fontSrc:        ["'self'", 'https://fonts.gstatic.com', 'data:'],
       imgSrc:         ["'self'", 'data:', 'https:', 'http:'],
