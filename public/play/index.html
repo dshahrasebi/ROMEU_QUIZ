@@ -22,6 +22,35 @@
       min-height: 0;
     }
     .answer-tile { min-height: 0; font-size: 1.1rem; }
+    /* Larger shapes on phone */
+    .answer-tile .shape-icon { font-size: 3.5rem; }
+    /* Timer bar */
+    #timer-bar-wrap {
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      height: 8px;
+      background: rgba(255,255,255,0.2);
+      border-radius: 0 0 12px 12px;
+      overflow: hidden;
+    }
+    #timer-bar {
+      height: 100%;
+      background: #fff;
+      width: 100%;
+      transform-origin: right;
+      border-radius: 0 0 12px 12px;
+    }
+    #timer-points {
+      position: absolute;
+      bottom: 16px; left: 0; right: 0;
+      text-align: center;
+      font-size: 1.4rem;
+      font-weight: 900;
+      color: white;
+      text-shadow: 0 1px 4px rgba(0,0,0,0.5);
+      pointer-events: none;
+    }
+    #screen-question { position: relative; }
     #screen-lobby .chip-grid {
       display: flex;
       flex-wrap: wrap;
@@ -73,7 +102,7 @@
 <div id="screen-lobby" class="screen flex-col items-center justify-center h-full p-6 gap-4">
   <div class="text-center">
     <h1 class="text-3xl font-black">Get ready! 🎮</h1>
-    <p class="text-xl font-bold mt-2"><span id="lobby-count">0</span> player(s) joined</p>
+    <p id="lobby-count-line" class="text-xl font-bold mt-2"><span id="lobby-count">0</span> player(s) joined</p>
   </div>
   <div class="chip-grid w-full max-w-sm px-4"></div>
   <p class="pulse text-white/60 font-bold text-sm mt-4">Waiting for host to start…</p>
@@ -103,14 +132,19 @@
       <span class="opt-label" data-index="3"></span>
     </button>
   </div>
+  <!-- Depleting timer bar pinned to bottom of question screen -->
+  <div id="timer-bar-wrap"><div id="timer-bar"></div></div>
+  <div id="timer-points"></div>
 </div>
 
 <!-- ── Screen 5: Feedback ─────────────────────────────────────────────────── -->
 <div id="screen-feedback" class="screen flex-col items-center justify-center h-full p-6 gap-5 text-center">
   <div id="feedback-icon" class="text-8xl spring-in"></div>
   <div id="feedback-result" class="text-2xl font-black"></div>
+  <div id="feedback-streak" class="hidden text-xl font-black text-yellow-300"></div>
   <div id="feedback-score" class="text-5xl font-black count-bounce">0</div>
   <div id="feedback-rank" class="text-white/70 font-bold text-lg"></div>
+  <div id="feedback-explanation" class="hidden bg-white/10 rounded-2xl px-5 py-3 text-sm font-bold text-white/80 max-w-xs text-center"></div>
   <div id="feedback-waiting" class="hidden pulse text-white/50 font-bold text-sm mt-2">
     Waiting for next question…
   </div>
@@ -131,11 +165,72 @@
 
 const CONFETTI_COLORS = ['#E21B3C','#1368CE','#D89E00','#26890C','#FFFFFF','#FF69B4'];
 
+// ── Branding ──────────────────────────────────────────────────────────────────
+
+let brandingSettings = {};
+
+(async () => {
+  try {
+    const res = await fetch('/api/settings/public');
+    if (!res.ok) return;
+    const s = await res.json();
+    brandingSettings = s;
+    if (s.platform_name) document.title = s.platform_name;
+    if (s.accent_color && /^#[0-9a-fA-F]{6}$/.test(s.accent_color)) {
+      document.documentElement.style.setProperty('--accent', s.accent_color);
+    }
+    if (s.logo_url) {
+      const logoWrap = document.getElementById('pin-logo-wrap');
+      const logoImg  = document.getElementById('pin-logo');
+      const logoFallback = document.getElementById('pin-logo-fallback');
+      if (logoImg) { logoImg.src = s.logo_url; logoWrap.classList.remove('hidden'); }
+      if (logoFallback) logoFallback.style.display = 'none';
+    }
+  } catch { /* ignore */ }
+})();
+
 let socket = null;
 let savedPin = '';
 let savedNickname = '';
 let savedPlayerId = null;
 let currentScore = 0;
+let playerBarRaf = null;
+let playerBarStart = null;
+let playerBarTotal = 0;
+
+// ── Timer bar ─────────────────────────────────────────────────────────────────
+
+function startTimerBar(tls) {
+  cancelTimerBar();
+  const bar = document.getElementById('timer-bar');
+  const pts = document.getElementById('timer-points');
+  if (!bar) return;
+  playerBarTotal = tls * 1000;
+  playerBarStart = performance.now();
+  function frame(ts) {
+    const elapsed = ts - playerBarStart;
+    const timeLeft = Math.max(0, playerBarTotal - elapsed);
+    const pct = (timeLeft / playerBarTotal) * 100;
+    bar.style.width = pct + '%';
+    if (pts) pts.textContent = Math.round(1000 * (timeLeft / playerBarTotal));
+    if (timeLeft > 0) {
+      playerBarRaf = requestAnimationFrame(frame);
+    } else {
+      bar.style.width = '0%';
+      if (pts) pts.textContent = '0';
+      lockTiles();
+    }
+  }
+  playerBarRaf = requestAnimationFrame(frame);
+}
+
+function cancelTimerBar() {
+  if (playerBarRaf) { cancelAnimationFrame(playerBarRaf); playerBarRaf = null; }
+  const bar = document.getElementById('timer-bar');
+  if (bar) bar.style.width = '0%';
+  const pts = document.getElementById('timer-points');
+  if (pts) pts.textContent = '';
+}
 
 // ── Screen helpers ────────────────────────────────────────────────────────────
 
@@ -183,6 +278,24 @@ function joinGame() {
     showNicknameError('Nickname is required');
     return;
   }
+  // If require_nickname_confirm is enabled, show confirmation screen first
+  if (brandingSettings.require_nickname_confirm === 'true') {
+    document.getElementById('confirm-nickname').textContent = nickname;
+    showScreen('screen-confirm');
+    return;
+  }
+  _doJoin(nickname);
+}
+
+document.getElementById('btn-confirm-yes').onclick = () => {
+  _doJoin(document.getElementById('nickname-input').value.trim());
+};
+document.getElementById('btn-confirm-no').onclick = () => {
+  showScreen('screen-nickname');
+  document.getElementById('nickname-input').focus();
+};
+
+function _doJoin(nickname) {
   if (!socket || !socket.connected) {
     socket = io({ transports: ['websocket'] });
     bindSocketEvents();
@@ -205,6 +318,10 @@ function showNicknameError(msg) {
 
 function bindSocketEvents() {
   socket.on('join-error', ({ message }) => {
+    // Return to nickname screen from confirmation screen if join was rejected
+    if (document.getElementById('screen-confirm').classList.contains('active')) {
+      showScreen('screen-nickname');
+    }
     if (document.getElementById('screen-nickname').classList.contains('active')) {
       showNicknameError(message);
     } else {
@@ -215,12 +332,24 @@ function bindSocketEvents() {
   socket.on('join-success', ({ playerId, nickname, playerCount }) => {
     savedPlayerId = playerId;
     savedNickname = nickname;
-    document.getElementById('lobby-count').textContent = playerCount;
+    const countLine = document.getElementById('lobby-count-line');
+    if (playerCount !== null && playerCount !== undefined) {
+      document.getElementById('lobby-count').textContent = playerCount;
+      if (countLine) countLine.style.display = '';
+    } else {
+      if (countLine) countLine.style.display = 'none';
+    }
     showScreen('screen-lobby');
   });
 
   socket.on('lobby-update', ({ players, playerCount }) => {
-    document.getElementById('lobby-count').textContent = playerCount;
+    const countLine = document.getElementById('lobby-count-line');
+    if (playerCount !== null && playerCount !== undefined) {
+      document.getElementById('lobby-count').textContent = playerCount;
+      if (countLine) countLine.style.display = '';
+    } else {
+      if (countLine) countLine.style.display = 'none';
+    }
     updateLobbyChips(players);
   });
 
@@ -230,8 +359,20 @@ function bindSocketEvents() {
 
     document.getElementById('q-progress').textContent =
       `Q ${data.questionIndex + 1} / ${data.totalQuestions}`;
-    document.getElementById('q-text').textContent = data.text;
+
+    // Question text + optional image
+    const imgHtml = data.imageUrl
+      ? `<img src="${esc(data.imageUrl)}" alt="" style="max-height:160px;border-radius:12px;object-fit:cover;width:100%;margin-bottom:8px" onerror="this.remove()">`
+      : '';
+    document.getElementById('q-text').innerHTML = `${imgHtml}<span>${esc(data.text)}</span>`;
+
+    // T/F vs MCQ tile layout
+    const isTF = data.type === 'truefalse';
+    const grid = document.querySelector('.tile-grid');
+    grid.style.gridTemplateRows = isTF ? '1fr' : '1fr 1fr';
     data.options.forEach((opt, i) => {
+      const tile = document.querySelector(`.answer-tile[data-index="${i}"]`);
+      tile.style.display = (isTF && i >= 2) ? 'none' : '';
       document.querySelector(`.opt-label[data-index="${i}"]`).textContent = opt;
     });
 
@@ -242,6 +383,7 @@ function bindSocketEvents() {
 
     showScreen('screen-question');
     document.getElementById('feedback-waiting').classList.add('hidden');
+    startTimerBar(data.timeLimitSeconds);
   });
 
   socket.on('answer-accepted', () => {
@@ -253,6 +395,7 @@ function bindSocketEvents() {
   });
 
   socket.on('question-reveal', (data) => {
+    cancelTimerBar();
     const myResult = data.playerResults && data.playerResults[savedNickname];
     const isCorrect = myResult ? myResult.correct : false;
     const newScore = myResult ? myResult.newScore : currentScore;
@@ -262,22 +405,36 @@ function bindSocketEvents() {
     // Feedback icon
     document.getElementById('feedback-icon').textContent = isCorrect ? '✅' : '❌';
     document.getElementById('feedback-icon').style.animation = 'none';
-    void document.getElementById('feedback-icon').offsetWidth; // reflow
+    void document.getElementById('feedback-icon').offsetWidth;
     document.getElementById('feedback-icon').style.animation = '';
     document.getElementById('feedback-icon').classList.add('spring-in');
 
     document.getElementById('feedback-result').textContent = isCorrect
       ? `+${myResult.pointsEarned} points!` : 'Not this time…';
 
+    // Streak bonus
+    const streakEl = document.getElementById('feedback-streak');
+    if (myResult && myResult.bonusPoints > 0) {
+      streakEl.textContent = `🔥 Streak bonus! +${myResult.bonusPoints}`;
+      streakEl.classList.remove('hidden');
+    } else {
+      streakEl.classList.add('hidden');
+    }
+
     // Animate score counter
-    animateCounter(
-      document.getElementById('feedback-score'),
-      oldScore, newScore, 800
-    );
+    animateCounter(document.getElementById('feedback-score'), oldScore, newScore, 800);
 
     if (isCorrect) spawnConfetti();
 
-    // Rank
+    // Explanation
+    const explEl = document.getElementById('feedback-explanation');
+    if (data.explanation) {
+      explEl.textContent = data.explanation;
+      explEl.classList.remove('hidden');
+    } else {
+      explEl.classList.add('hidden');
+    }
+
     document.getElementById('feedback-rank').textContent = '';
     document.getElementById('feedback-waiting').classList.add('hidden');
     setTimeout(() => {
@@ -375,7 +532,9 @@ function esc(str) {
   return String(str ?? '')
     .replace(/&/g,'&amp;')
     .replace(/</g,'&lt;')
-    .replace(/>/g,'&gt;');
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;')
+    .replace(/'/g,'&#x27;');
 }
 
 // ── Init ─────────────────────────────────────────────────────────────────────

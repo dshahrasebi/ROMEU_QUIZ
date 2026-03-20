@@ -12,9 +12,31 @@
   <style>
     [x-cloak] { display: none !important; }
     .bar-fill { height: 100%; border-radius: 4px; transition: width 0.8s ease-out; }
+    @keyframes timesup-pop {
+      0%   { opacity: 0; transform: scale(0.55); }
+      18%  { opacity: 1; transform: scale(1.08); }
+      30%  { opacity: 1; transform: scale(1);    }
+      78%  { opacity: 1; transform: scale(1);    }
+      100% { opacity: 0; transform: scale(0.9);  }
+    }
+    #timesup-card { animation: none; }
+    #timesup-overlay.active #timesup-card {
+      animation: timesup-pop 2s cubic-bezier(.22,.68,0,1.2) forwards;
+    }
+    .stab { background: rgba(255,255,255,0.15); color: white; }
+    .stab:hover { background: rgba(255,255,255,0.25); }
+    .stab-active { background: white !important; color: #5b21b6 !important; }
   </style>
 </head>
 <body class="gradient-bg min-h-screen">
+
+<!-- ── TIME'S UP overlay ──────────────────────────────────────────────────── -->
+<div id="timesup-overlay" class="hidden fixed inset-0 flex items-center justify-center z-50 pointer-events-none">
+  <div id="timesup-card" class="flex flex-col items-center gap-4 bg-black/75 backdrop-blur-sm rounded-3xl px-20 py-12">
+    <div style="font-size:5rem;line-height:1">⏰</div>
+    <div class="font-black text-white tracking-widest" style="font-size:3.5rem">TIME'S UP!</div>
+  </div>
+</div>
 
 <!-- ── LIBRARY PANEL ──────────────────────────────────────────────────────── -->
 <div id="panel-library" class="max-w-4xl mx-auto p-6">
@@ -24,6 +46,14 @@
       <button id="btn-new-quiz"
         class="bg-white text-purple-800 font-black px-5 py-2 rounded-xl hover:bg-purple-50 transition-colors">
         ＋ New Quiz
+      </button>
+      <button onclick="showPanel('settings')"
+        class="bg-white/20 hover:bg-white/30 text-white font-bold px-4 py-2 rounded-xl transition-colors">
+        ⚙ Settings
+      </button>
+      <button onclick="showPanel('history')"
+        class="bg-white/20 hover:bg-white/30 text-white font-bold px-4 py-2 rounded-xl transition-colors">
+        📊 History
       </button>
       <form method="POST" action="/host/logout" style="display:inline">
         <button type="submit" class="bg-white/20 hover:bg-white/30 text-white font-bold px-4 py-2 rounded-xl transition-colors">
@@ -57,6 +87,229 @@
   </div>
 </div>
 
+<!-- ── SETTINGS PANEL ────────────────────────────────────────────────────── -->
+<div id="panel-settings" class="hidden max-w-3xl mx-auto p-6">
+  <div class="flex items-center gap-4 mb-6">
+    <button onclick="showPanel('library')"
+      class="bg-white/20 hover:bg-white/30 text-white font-bold px-4 py-2 rounded-xl transition-colors">
+      ← Quizzes
+    </button>
+    <h1 class="text-3xl font-black">⚙ Settings</h1>
+  </div>
+
+  <!-- Tab bar -->
+  <div class="flex gap-2 mb-6 flex-wrap">
+    <button onclick="showSettingsTab('general')"   id="stab-general"   class="stab stab-active px-4 py-2 rounded-xl font-bold text-sm transition-colors">🎨 General</button>
+    <button onclick="showSettingsTab('game')"      id="stab-game"      class="stab px-4 py-2 rounded-xl font-bold text-sm transition-colors">🎮 Game</button>
+    <button onclick="showSettingsTab('players')"   id="stab-players"   class="stab px-4 py-2 rounded-xl font-bold text-sm transition-colors">👥 Players</button>
+    <button onclick="showSettingsTab('session')"   id="stab-session"   class="stab px-4 py-2 rounded-xl font-bold text-sm transition-colors">⏱ Session</button>
+    <button onclick="showSettingsTab('security')"  id="stab-security"  class="stab px-4 py-2 rounded-xl font-bold text-sm transition-colors">🔒 Security</button>
+  </div>
+
+  <!-- ── General (Branding) ────────────────────────────────────────────── -->
+  <div id="stab-panel-general">
+    <div class="bg-white/10 backdrop-blur rounded-2xl p-6 space-y-5">
+      <h2 class="text-xl font-black">Branding</h2>
+      <div>
+        <label class="block text-sm font-bold text-white/70 mb-1">Platform Name</label>
+        <input id="s-platform_name" type="text" maxlength="60"
+          class="w-full rounded-xl px-4 py-3 text-gray-800 font-bold focus:outline-none focus:ring-2 focus:ring-white"
+          placeholder="ROMEU Quiz">
+      </div>
+      <div>
+        <label class="block text-sm font-bold text-white/70 mb-1">Logo URL <span class="font-normal opacity-60">(optional, https://…)</span></label>
+        <input id="s-logo_url" type="url"
+          class="w-full rounded-xl px-4 py-3 text-gray-800 font-bold focus:outline-none focus:ring-2 focus:ring-white"
+          placeholder="https://example.com/logo.png">
+      </div>
+      <div>
+        <label class="block text-sm font-bold text-white/70 mb-1">Accent Color</label>
+        <div class="flex gap-3 items-center">
+          <input id="s-accent_color" type="text" maxlength="7"
+            class="flex-1 rounded-xl px-4 py-3 text-gray-800 font-bold focus:outline-none focus:ring-2 focus:ring-white"
+            placeholder="#7c3aed">
+          <input type="color" id="s-accent_color_picker"
+            class="w-12 h-12 rounded-xl border-0 cursor-pointer bg-transparent"
+            oninput="document.getElementById('s-accent_color').value=this.value">
+          <div id="s-accent_preview" class="w-10 h-10 rounded-xl border-2 border-white/30"></div>
+        </div>
+        <p class="text-xs text-white/50 mt-1">Applied to display and player screens.</p>
+      </div>
+      <div id="s-msg-general" class="hidden rounded-xl px-4 py-3 text-sm font-bold"></div>
+      <button onclick="saveSettings('general',['platform_name','logo_url','accent_color'])"
+        class="w-full bg-white text-purple-800 font-black text-lg rounded-xl py-3 hover:bg-purple-50 transition-colors shadow-lg">
+        Save Branding
+      </button>
+    </div>
+  </div>
+
+  <!-- ── Game Defaults ─────────────────────────────────────────────────── -->
+  <div id="stab-panel-game" class="hidden">
+    <div class="bg-white/10 backdrop-blur rounded-2xl p-6 space-y-5">
+      <h2 class="text-xl font-black">Game Defaults</h2>
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-bold text-white/70 mb-1">Default Time Limit <span class="opacity-60">(sec, 5–120)</span></label>
+          <input id="s-default_time_limit" type="number" min="5" max="120"
+            class="w-full rounded-xl px-4 py-3 text-gray-800 font-bold focus:outline-none focus:ring-2 focus:ring-white">
+        </div>
+        <div>
+          <label class="block text-sm font-bold text-white/70 mb-1">Max Players <span class="opacity-60">(2–100)</span></label>
+          <input id="s-max_players" type="number" min="2" max="100"
+            class="w-full rounded-xl px-4 py-3 text-gray-800 font-bold focus:outline-none focus:ring-2 focus:ring-white">
+        </div>
+      </div>
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-bold text-white/70 mb-1">Streak Bonus at 3× <span class="opacity-60">(pts)</span></label>
+          <input id="s-streak_bonus_3" type="number" min="0" max="500"
+            class="w-full rounded-xl px-4 py-3 text-gray-800 font-bold focus:outline-none focus:ring-2 focus:ring-white">
+        </div>
+        <div>
+          <label class="block text-sm font-bold text-white/70 mb-1">Streak Bonus at 5× <span class="opacity-60">(pts)</span></label>
+          <input id="s-streak_bonus_5" type="number" min="0" max="500"
+            class="w-full rounded-xl px-4 py-3 text-gray-800 font-bold focus:outline-none focus:ring-2 focus:ring-white">
+        </div>
+      </div>
+      <div id="s-msg-game" class="hidden rounded-xl px-4 py-3 text-sm font-bold"></div>
+      <button onclick="saveSettings('game',['default_time_limit','max_players','streak_bonus_3','streak_bonus_5'])"
+        class="w-full bg-white text-purple-800 font-black text-lg rounded-xl py-3 hover:bg-purple-50 transition-colors shadow-lg">
+        Save Game Settings
+      </button>
+    </div>
+  </div>
+
+  <!-- ── Players ───────────────────────────────────────────────────────── -->
+  <div id="stab-panel-players" class="hidden">
+    <div class="bg-white/10 backdrop-blur rounded-2xl p-6 space-y-5">
+      <h2 class="text-xl font-black">Player Experience</h2>
+      <label class="flex items-center gap-3 cursor-pointer">
+        <input id="s-allow_late_joins" type="checkbox" class="w-5 h-5 rounded accent-purple-600">
+        <span class="font-bold">Allow late joins <span class="font-normal text-white/60">— players can join after game starts</span></span>
+      </label>
+      <label class="flex items-center gap-3 cursor-pointer">
+        <input id="s-require_nickname_confirm" type="checkbox" class="w-5 h-5 rounded accent-purple-600">
+        <span class="font-bold">Require nickname confirmation <span class="font-normal text-white/60">— player must confirm before entering lobby</span></span>
+      </label>
+      <label class="flex items-center gap-3 cursor-pointer">
+        <input id="s-profanity_filter" type="checkbox" class="w-5 h-5 rounded accent-purple-600">
+        <span class="font-bold">Profanity filter <span class="font-normal text-white/60">— blocks offensive nicknames</span></span>
+      </label>
+      <div id="s-msg-players" class="hidden rounded-xl px-4 py-3 text-sm font-bold"></div>
+      <button onclick="saveSettings('players',['allow_late_joins','require_nickname_confirm','profanity_filter'])"
+        class="w-full bg-white text-purple-800 font-black text-lg rounded-xl py-3 hover:bg-purple-50 transition-colors shadow-lg">
+        Save Player Settings
+      </button>
+    </div>
+  </div>
+
+  <!-- ── Session Controls ──────────────────────────────────────────────── -->
+  <div id="stab-panel-session" class="hidden">
+    <div class="bg-white/10 backdrop-blur rounded-2xl p-6 space-y-5">
+      <h2 class="text-xl font-black">Session Controls</h2>
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-bold text-white/70 mb-1">Auto-advance after reveal <span class="opacity-60">(sec, 0 = manual)</span></label>
+          <input id="s-auto_advance_seconds" type="number" min="0" max="300"
+            class="w-full rounded-xl px-4 py-3 text-gray-800 font-bold focus:outline-none focus:ring-2 focus:ring-white">
+        </div>
+        <div>
+          <label class="block text-sm font-bold text-white/70 mb-1">Reveal delay <span class="opacity-60">(sec, 0 = instant)</span></label>
+          <input id="s-reveal_delay_seconds" type="number" min="0" max="30"
+            class="w-full rounded-xl px-4 py-3 text-gray-800 font-bold focus:outline-none focus:ring-2 focus:ring-white">
+        </div>
+      </div>
+      <div>
+        <label class="block text-sm font-bold text-white/70 mb-1">Leaderboard display duration <span class="opacity-60">(sec, 0 = manual)</span></label>
+        <input id="s-leaderboard_duration_seconds" type="number" min="0" max="60"
+          class="w-full rounded-xl px-4 py-3 text-gray-800 font-bold focus:outline-none focus:ring-2 focus:ring-white">
+      </div>
+      <label class="flex items-center gap-3 cursor-pointer">
+        <input id="s-show_answer_counts" type="checkbox" class="w-5 h-5 rounded accent-purple-600">
+        <span class="font-bold">Show answer counts on reveal <span class="font-normal text-white/60">— display bar chart of responses</span></span>
+      </label>
+      <label class="flex items-center gap-3 cursor-pointer">
+        <input id="s-show_player_count" type="checkbox" class="w-5 h-5 rounded accent-purple-600">
+        <span class="font-bold">Show player count in lobby <span class="font-normal text-white/60">— visible on display screen</span></span>
+      </label>
+      <div id="s-msg-session" class="hidden rounded-xl px-4 py-3 text-sm font-bold"></div>
+      <button onclick="saveSettings('session',['auto_advance_seconds','reveal_delay_seconds','leaderboard_duration_seconds','show_answer_counts','show_player_count'])"
+        class="w-full bg-white text-purple-800 font-black text-lg rounded-xl py-3 hover:bg-purple-50 transition-colors shadow-lg">
+        Save Session Settings
+      </button>
+    </div>
+  </div>
+
+  <!-- ── Security ──────────────────────────────────────────────────────── -->
+  <div id="stab-panel-security" class="hidden">
+    <div class="bg-white/10 backdrop-blur rounded-2xl p-6 space-y-5">
+      <h2 class="text-xl font-black">Security</h2>
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-bold text-white/70 mb-1">Session timeout <span class="opacity-60">(hours, 1–24)</span></label>
+          <input id="s-session_timeout_hours" type="number" min="1" max="24"
+            class="w-full rounded-xl px-4 py-3 text-gray-800 font-bold focus:outline-none focus:ring-2 focus:ring-white">
+        </div>
+        <div>
+          <label class="block text-sm font-bold text-white/70 mb-1">Max login attempts <span class="opacity-60">(per 15 min, 3–100)</span></label>
+          <input id="s-max_login_attempts" type="number" min="3" max="100"
+            class="w-full rounded-xl px-4 py-3 text-gray-800 font-bold focus:outline-none focus:ring-2 focus:ring-white">
+        </div>
+      </div>
+      <div id="s-msg-security" class="hidden rounded-xl px-4 py-3 text-sm font-bold"></div>
+      <button onclick="saveSettings('security',['session_timeout_hours','max_login_attempts'])"
+        class="w-full bg-white text-purple-800 font-black text-lg rounded-xl py-3 hover:bg-purple-50 transition-colors shadow-lg">
+        Save Security Settings
+      </button>
+    </div>
+
+    <!-- Change Password card -->
+    <div class="bg-white/10 backdrop-blur rounded-2xl p-6 mt-4">
+      <h2 class="text-xl font-black mb-1">Change Password</h2>
+      <p class="text-white/60 text-sm font-bold mb-5">Updates take effect immediately and persist across restarts.</p>
+      <div class="space-y-4 max-w-sm">
+        <div>
+          <label class="block text-sm font-bold text-white/70 mb-1">Current Password</label>
+          <input id="settings-current-pw" type="password" autocomplete="current-password"
+            class="w-full rounded-xl px-4 py-3 text-gray-800 font-bold focus:outline-none focus:ring-2 focus:ring-white"
+            placeholder="Enter current password">
+        </div>
+        <div>
+          <label class="block text-sm font-bold text-white/70 mb-1">New Password</label>
+          <input id="settings-new-pw" type="password" autocomplete="new-password"
+            class="w-full rounded-xl px-4 py-3 text-gray-800 font-bold focus:outline-none focus:ring-2 focus:ring-white"
+            placeholder="At least 8 characters">
+        </div>
+        <div>
+          <label class="block text-sm font-bold text-white/70 mb-1">Confirm New Password</label>
+          <input id="settings-confirm-pw" type="password" autocomplete="new-password"
+            class="w-full rounded-xl px-4 py-3 text-gray-800 font-bold focus:outline-none focus:ring-2 focus:ring-white"
+            placeholder="Repeat new password">
+        </div>
+        <div id="settings-pw-msg" class="hidden rounded-xl px-4 py-3 text-sm font-bold"></div>
+        <button onclick="changePassword()"
+          class="w-full bg-white text-purple-800 font-black text-lg rounded-xl py-3 hover:bg-purple-50 transition-colors shadow-lg">
+          Update Password
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── HISTORY PANEL ────────────────────────────────────────────────────────── -->
+<div id="panel-history" class="hidden max-w-4xl mx-auto p-6">
+  <div class="flex items-center gap-4 mb-6">
+    <button onclick="showPanel('library')"
+      class="bg-white/20 hover:bg-white/30 text-white font-bold px-4 py-2 rounded-xl transition-colors">
+      ← Quizzes
+    </button>
+    <h1 class="text-3xl font-black">📊 Session History</h1>
+  </div>
+  <div id="history-list" class="space-y-3">
+    <p class="text-white/40 font-bold text-center py-8">Loading…</p>
+  </div>
+</div>
+
 <!-- ── GAME PANEL ─────────────────────────────────────────────────────────── -->
 <div id="panel-game" class="hidden max-w-5xl mx-auto p-6">
   <div class="grid grid-cols-3 gap-6 h-screen max-h-[calc(100vh-48px)]">
@@ -83,59 +336,84 @@
 
     <!-- Center: main stage -->
     <div class="col-span-2 flex flex-col gap-4">
-      <div class="bg-white/10 backdrop-blur rounded-2xl p-5 flex-1 flex flex-col">
-        <div class="flex items-center gap-4 mb-4">
-          <span id="phase-badge" class="bg-white/20 px-3 py-1 rounded-full text-sm font-bold uppercase tracking-wide">Lobby</span>
-          <span id="question-progress" class="text-white/60 text-sm font-bold"></span>
-        </div>
 
-        <!-- Question text & tally bars -->
-        <div id="question-display" class="flex-1 flex flex-col justify-center">
-          <p class="text-white/50 text-center font-bold text-lg">Waiting for players to join…</p>
+      <!-- Top card: question text + timer ring (height matches PIN card) -->
+      <div class="bg-white/10 backdrop-blur rounded-2xl p-5 flex items-center gap-5">
+        <div class="flex-1 min-w-0 flex flex-col gap-3">
+          <div class="flex items-center gap-3">
+            <span id="phase-badge" class="bg-white/20 px-3 py-1 rounded-full text-sm font-bold uppercase tracking-wide">Lobby</span>
+            <span id="question-progress" class="text-white/60 text-sm font-bold"></span>
+          </div>
+          <div id="question-display">
+            <p class="text-white/50 font-bold text-3xl">Waiting for players to join…</p>
+          </div>
         </div>
+        <!-- Circular countdown ring -->
+        <div id="host-ring-wrap" class="hidden shrink-0" style="position:relative;width:96px;height:96px">
+          <svg viewBox="0 0 120 120" width="96" height="96" style="display:block">
+            <circle cx="60" cy="60" r="54" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="10"/>
+            <circle id="host-ring-circle" cx="60" cy="60" r="54"
+              fill="none" stroke="#fff" stroke-width="10"
+              stroke-linecap="round"
+              stroke-dasharray="339.292"
+              stroke-dashoffset="0"
+              style="transform:rotate(-90deg);transform-origin:center"/>
+          </svg>
+          <span id="host-ring-timer" class="font-black text-xl"
+            style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;line-height:1"></span>
+        </div>
+      </div>
 
-        <!-- Tally bars (hidden until question active) -->
-        <div id="tally-bars" class="hidden grid grid-cols-2 gap-3 mt-4">
-          <div class="bg-red-600 rounded-xl p-3">
-            <div class="flex items-center gap-2 mb-1">
-              <span class="text-xl">▲</span>
-              <span id="opt-text-0" class="text-sm font-bold truncate flex-1"></span>
-              <span id="tally-count-0" class="text-sm font-black">0</span>
-            </div>
-            <div class="bg-white/20 rounded-full h-3">
-              <div id="tally-bar-0" class="bar-fill bg-white" style="width:0%"></div>
-            </div>
+      <!-- Answer options (shown during question & reveal, hidden otherwise) -->
+      <div id="tally-bars" class="hidden bg-white/10 backdrop-blur rounded-2xl p-6 grid grid-cols-2 gap-3">
+        <div class="bg-red-600 rounded-xl p-4">
+          <div class="flex items-center gap-3 mb-2">
+            <span class="text-2xl">▲</span>
+            <span id="opt-text-0" class="text-base font-bold truncate flex-1"></span>
+            <span id="tally-count-0" class="text-base font-black">0</span>
           </div>
-          <div class="bg-blue-600 rounded-xl p-3" style="background:#1368CE">
-            <div class="flex items-center gap-2 mb-1">
-              <span class="text-xl">◆</span>
-              <span id="opt-text-1" class="text-sm font-bold truncate flex-1"></span>
-              <span id="tally-count-1" class="text-sm font-black">0</span>
-            </div>
-            <div class="bg-white/20 rounded-full h-3">
-              <div id="tally-bar-1" class="bar-fill bg-white" style="width:0%"></div>
-            </div>
+          <div class="bg-white/20 rounded-full h-3"><div id="tally-bar-0" class="bar-fill bg-white" style="width:0%"></div></div>
+        </div>
+        <div class="rounded-xl p-4" style="background:#1368CE">
+          <div class="flex items-center gap-3 mb-2">
+            <span class="text-2xl">◆</span>
+            <span id="opt-text-1" class="text-base font-bold truncate flex-1"></span>
+            <span id="tally-count-1" class="text-base font-black">0</span>
           </div>
-          <div class="rounded-xl p-3" style="background:#D89E00">
-            <div class="flex items-center gap-2 mb-1">
-              <span class="text-xl">●</span>
-              <span id="opt-text-2" class="text-sm font-bold truncate flex-1"></span>
-              <span id="tally-count-2" class="text-sm font-black">0</span>
-            </div>
-            <div class="bg-white/20 rounded-full h-3">
-              <div id="tally-bar-2" class="bar-fill bg-white" style="width:0%"></div>
-            </div>
+          <div class="bg-white/20 rounded-full h-3"><div id="tally-bar-1" class="bar-fill bg-white" style="width:0%"></div></div>
+        </div>
+        <div class="rounded-xl p-4" style="background:#D89E00">
+          <div class="flex items-center gap-3 mb-2">
+            <span class="text-2xl">●</span>
+            <span id="opt-text-2" class="text-base font-bold truncate flex-1"></span>
+            <span id="tally-count-2" class="text-base font-black">0</span>
           </div>
-          <div class="rounded-xl p-3" style="background:#26890C">
-            <div class="flex items-center gap-2 mb-1">
-              <span class="text-xl">■</span>
-              <span id="opt-text-3" class="text-sm font-bold truncate flex-1"></span>
-              <span id="tally-count-3" class="text-sm font-black">0</span>
-            </div>
-            <div class="bg-white/20 rounded-full h-3">
-              <div id="tally-bar-3" class="bar-fill bg-white" style="width:0%"></div>
-            </div>
+          <div class="bg-white/20 rounded-full h-3"><div id="tally-bar-2" class="bar-fill bg-white" style="width:0%"></div></div>
+        </div>
+        <div class="rounded-xl p-4" style="background:#26890C">
+          <div class="flex items-center gap-3 mb-2">
+            <span class="text-2xl">■</span>
+            <span id="opt-text-3" class="text-base font-bold truncate flex-1"></span>
+            <span id="tally-count-3" class="text-base font-black">0</span>
           </div>
+          <div class="bg-white/20 rounded-full h-3"><div id="tally-bar-3" class="bar-fill bg-white" style="width:0%"></div></div>
+        </div>
+      </div>
+
+      <!-- Explanation (shown after reveal) -->
+      <div id="reveal-explanation" class="hidden bg-white/15 backdrop-blur rounded-2xl px-5 py-3 text-white font-bold text-sm text-center"></div>
+
+      <!-- Live participation grid (flex-1) -->
+      <div class="bg-white/10 backdrop-blur rounded-2xl p-5 flex-1 flex flex-col min-h-0 gap-3">
+        <div id="response-placeholder" class="flex-1 flex items-center justify-center">
+          <p class="text-white/30 font-bold text-sm text-center">Live responses appear here during questions</p>
+        </div>
+        <div id="response-grid" style="display:none" class="flex-1 flex flex-col gap-3 min-h-0">
+          <div class="flex items-center justify-between shrink-0">
+            <span class="text-xs font-bold text-white/60 uppercase tracking-wide">Responses</span>
+            <span id="response-counter" class="text-sm font-black">0 / 0</span>
+          </div>
+          <div id="response-chips" class="flex flex-wrap gap-2 content-start overflow-y-auto flex-1 min-h-0"></div>
         </div>
       </div>
 
@@ -169,18 +447,217 @@ let currentStatus = 'lobby';
 let currentQuestionIndex = -1;
 let currentQuestionTotal = 0;
 let currentOptions = [];
+let hostRingRaf = null;
+let timesUpTimeout = null;
+let _countdownInterval = null; // auto-advance countdown on the primary button
+
+function _clearCountdown() {
+  if (_countdownInterval) { clearInterval(_countdownInterval); _countdownInterval = null; }
+}
+
+function _startButtonCountdown(seconds, baseLabel) {
+  _clearCountdown();
+  const btn = document.getElementById('btn-primary-action');
+  let remaining = seconds;
+  btn.textContent = `${baseLabel} (${remaining})`;
+  _countdownInterval = setInterval(() => {
+    remaining--;
+    if (remaining <= 0) {
+      _clearCountdown();
+      btn.textContent = baseLabel;
+    } else {
+      btn.textContent = `${baseLabel} (${remaining})`;
+    }
+  }, 1000);
+}
+
+// ── Host ring timer ───────────────────────────────────────────────────────────
+
+const HOST_RING_CIRCUMFERENCE = 2 * Math.PI * 54; // ≈ 339.292
+
+function startHostRing(tls) {
+  cancelHostRing();
+  const ring  = document.getElementById('host-ring-circle');
+  const label = document.getElementById('host-ring-timer');
+  const wrap  = document.getElementById('host-ring-wrap');
+  if (!ring) return;
+  wrap.classList.remove('hidden');
+  ring.style.strokeDashoffset = '0';
+  const totalMs = tls * 1000;
+  const startTs = performance.now();
+  function frame(ts) {
+    const elapsed  = ts - startTs;
+    const timeLeft = Math.max(0, totalMs - elapsed);
+    const ratio    = timeLeft / totalMs;
+    ring.style.strokeDashoffset  = HOST_RING_CIRCUMFERENCE * (1 - ratio);
+    label.textContent = Math.round(1000 * ratio);
+    if (timeLeft > 0 && document.getElementById('host-ring-circle')) {
+      hostRingRaf = requestAnimationFrame(frame);
+    }
+  }
+  hostRingRaf = requestAnimationFrame(frame);
+  // Dedicated timeout — fires showTimesUp reliably even if rAF is cancelled early
+  timesUpTimeout = setTimeout(showTimesUp, totalMs);
+}
+
+function cancelHostRing() {
+  if (hostRingRaf)    { cancelAnimationFrame(hostRingRaf); hostRingRaf = null; }
+  if (timesUpTimeout) { clearTimeout(timesUpTimeout);     timesUpTimeout = null; }
+  const wrap = document.getElementById('host-ring-wrap');
+  if (wrap) wrap.classList.add('hidden');
+}
+
+function showTimesUp() {
+  const overlay = document.getElementById('timesup-overlay');
+  if (!overlay) return;
+  overlay.classList.remove('hidden');
+  overlay.classList.add('active');
+  setTimeout(() => {
+    overlay.classList.remove('active');
+    overlay.classList.add('hidden');
+  }, 2000);
+}
 
 // ── Panels ────────────────────────────────────────────────────────────────────
 
 function showPanel(name) {
   document.getElementById('panel-library').classList.toggle('hidden', name !== 'library');
   document.getElementById('panel-game').classList.toggle('hidden', name !== 'game');
+  document.getElementById('panel-settings').classList.toggle('hidden', name !== 'settings');
+  document.getElementById('panel-history').classList.toggle('hidden', name !== 'history');
+  if (name === 'settings') {
+    ['settings-current-pw', 'settings-new-pw', 'settings-confirm-pw'].forEach(id => {
+      document.getElementById(id).value = '';
+    });
+    const msg = document.getElementById('settings-pw-msg');
+    msg.classList.add('hidden');
+    msg.textContent = '';
+    loadSettingsPanel();
+  }
+  if (name === 'history') loadHistory();
+}
+
+async function changePassword() {
+  const currentPassword = document.getElementById('settings-current-pw').value;
+  const newPassword     = document.getElementById('settings-new-pw').value;
+  const confirmPassword = document.getElementById('settings-confirm-pw').value;
+  const msg = document.getElementById('settings-pw-msg');
+
+  msg.classList.remove('hidden', 'bg-green-500/20', 'text-green-200', 'bg-red-500/20', 'text-red-200');
+
+  try {
+    const res = await apiFetch('/host/api/settings/password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ currentPassword, newPassword, confirmPassword }),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      msg.classList.add('bg-green-500/20', 'text-green-200');
+      msg.textContent = '✓ Password updated successfully';
+      document.getElementById('settings-current-pw').value = '';
+      document.getElementById('settings-new-pw').value = '';
+      document.getElementById('settings-confirm-pw').value = '';
+    } else {
+      msg.classList.add('bg-red-500/20', 'text-red-200');
+      msg.textContent = data.error || 'Something went wrong';
+    }
+  } catch {
+    msg.classList.add('bg-red-500/20', 'text-red-200');
+    msg.textContent = 'Network error — try again';
+  }
+}
+
+// ── Settings panel ────────────────────────────────────────────────────────────
+
+let _defaultTimeLimit = 20; // updated from settings when panel loads
+
+function showSettingsTab(tab) {
+  ['general','game','players','session','security'].forEach(t => {
+    document.getElementById(`stab-panel-${t}`).classList.toggle('hidden', t !== tab);
+    document.getElementById(`stab-${t}`).classList.toggle('stab-active', t === tab);
+  });
+}
+
+async function loadSettingsPanel() {
+  showSettingsTab('general');
+  try {
+    const res = await apiFetch('/host/api/settings');
+    if (!res.ok) return;
+    const s = await res.json();
+    // Text/number inputs
+    ['platform_name','logo_url','accent_color',
+     'default_time_limit','max_players','streak_bonus_3','streak_bonus_5',
+     'auto_advance_seconds','reveal_delay_seconds','leaderboard_duration_seconds',
+     'session_timeout_hours','max_login_attempts'].forEach(key => {
+      const el = document.getElementById(`s-${key}`);
+      if (el) el.value = s[key] ?? '';
+    });
+    // Checkboxes
+    ['allow_late_joins','require_nickname_confirm','profanity_filter',
+     'show_answer_counts','show_player_count'].forEach(key => {
+      const el = document.getElementById(`s-${key}`);
+      if (el) el.checked = s[key] === 'true';
+    });
+    // Sync color picker
+    const accentEl = document.getElementById('s-accent_color');
+    const picker   = document.getElementById('s-accent_color_picker');
+    const preview  = document.getElementById('s-accent_preview');
+    if (accentEl && picker && preview) {
+      picker.value = s.accent_color || '#7c3aed';
+      preview.style.background = s.accent_color || '#7c3aed';
+    }
+    // Cache default time limit for new questions
+    if (s.default_time_limit) _defaultTimeLimit = parseInt(s.default_time_limit, 10) || 20;
+    // Live preview on text input change
+    if (accentEl) {
+      accentEl.oninput = () => {
+        const v = accentEl.value;
+        if (/^#[0-9a-fA-F]{6}$/.test(v)) {
+          picker.value = v;
+          preview.style.background = v;
+        }
+      };
+    }
+  } catch { /* ignore */ }
+}
+
+async function saveSettings(tabName, keys) {
+  const msgEl = document.getElementById(`s-msg-${tabName}`);
+  const body = {};
+  keys.forEach(key => {
+    const el = document.getElementById(`s-${key}`);
+    if (!el) return;
+    if (el.type === 'checkbox') body[key] = String(el.checked);
+    else body[key] = el.value;
+  });
+  msgEl.classList.remove('hidden','bg-green-500/20','text-green-200','bg-red-500/20','text-red-200');
+  try {
+    const res = await apiFetch('/host/api/settings', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      msgEl.classList.add('bg-green-500/20', 'text-green-200');
+      msgEl.textContent = '✓ Settings saved';
+    } else {
+      const errs = data.errors ? Object.values(data.errors).join('; ') : data.error || 'Error';
+      msgEl.classList.add('bg-red-500/20', 'text-red-200');
+      msgEl.textContent = errs;
+    }
+  } catch {
+    msgEl.classList.add('bg-red-500/20', 'text-red-200');
+    msgEl.textContent = 'Network error — try again';
+  }
+  setTimeout(() => msgEl.classList.add('hidden'), 4000);
 }
 
 // ── Library ───────────────────────────────────────────────────────────────────
 
 async function loadQuizzes() {
-  const res = await fetch('/host/api/quizzes');
+  const res = await apiFetch('/host/api/quizzes');
   const quizzes = await res.json();
   renderQuizList(quizzes);
 }
@@ -222,6 +699,8 @@ function renderQuizList(quizzes) {
         </button>
         <button onclick="deleteQuiz(${q.id})"
           class="text-white/40 hover:text-red-300 text-xl transition-colors px-2">🗑</button>
+        <button onclick="duplicateQuiz(${q.id})"
+          class="text-white/40 hover:text-white text-xl transition-colors px-2" title="Duplicate quiz">⧉</button>
       </div>
 
       <!-- Question list (load on expand) -->
@@ -241,7 +720,7 @@ async function toggleQuizExpand(quizId, btn) {
     btn.textContent = container.classList.contains('hidden') ? '▾ Show Questions' : '▴ Hide Questions';
     return;
   }
-  const res = await fetch(`/host/api/quizzes/${quizId}`);
+  const res = await apiFetch(`/host/api/quizzes/${quizId}`);
   const quiz = await res.json();
   container.dataset.loaded = '1';
   renderQuestions(quizId, quiz.questions);
@@ -294,22 +773,32 @@ function renderQuestions(quizId, questions) {
 
 function _questionFormHTML(quizId, qData = null) {
   const isEdit = qData !== null;
-  const v = qData || { text: '', options: ['','','',''], correct_index: 0, time_limit_seconds: 20 };
-  const TILE_CLASSES = ['bg-red-600', 'bg-blue-600', '', ''];
+  const v = qData || { text: '', options: ['','','',''], correct_index: 0, time_limit_seconds: _defaultTimeLimit, type: 'mcq', image_url: null, explanation: null };
   const TILE_COLORS = ['#E21B3C','#1368CE','#D89E00','#26890C'];
   const TILE_LABELS = ['Red ▲','Blue ◆','Yellow ●','Green ■'];
+  const isTF = v.type === 'truefalse';
 
   return `
     <div class="bg-white/5 rounded-xl p-4 mt-2 space-y-3">
-      <div>
-        <label class="text-xs text-white/60 font-bold">Question</label>
-        <textarea class="qf-text w-full mt-1 rounded-lg px-3 py-2 text-gray-800 font-bold text-sm focus:outline-none resize-none" rows="2" maxlength="300">${esc(v.text)}</textarea>
+      <div class="flex gap-4 flex-wrap">
+        <div class="flex-1 min-w-0">
+          <label class="text-xs text-white/60 font-bold">Question</label>
+          <textarea class="qf-text w-full mt-1 rounded-lg px-3 py-2 text-gray-800 font-bold text-sm focus:outline-none resize-none" rows="2" maxlength="300">${esc(v.text)}</textarea>
+        </div>
+        <div>
+          <label class="text-xs text-white/60 font-bold block">Type</label>
+          <select class="qf-type mt-1 rounded-lg px-3 py-2 text-gray-800 font-bold text-sm focus:outline-none">
+            <option value="mcq" ${!isTF ? 'selected' : ''}>Multiple Choice</option>
+            <option value="truefalse" ${isTF ? 'selected' : ''}>True / False</option>
+          </select>
+        </div>
       </div>
       <div class="grid grid-cols-2 gap-2">
         ${[0,1,2,3].map(i => `
-          <div class="rounded-lg p-2" style="background:${TILE_COLORS[i]}">
-            <label class="text-xs text-white/80 font-bold">${TILE_LABELS[i]}</label>
-            <input class="qf-opt-${i} w-full mt-1 rounded px-2 py-1 text-gray-800 font-bold text-sm focus:outline-none" type="text" maxlength="90" value="${esc((v.options||[])[i]||'')}">
+          <div class="qf-opt-wrap-${i} rounded-lg p-2" style="background:${TILE_COLORS[i]};display:${isTF && i >= 2 ? 'none' : ''}">
+            <label class="text-xs text-white/80 font-bold">${isTF ? (i === 0 ? 'True' : 'False') : TILE_LABELS[i]}</label>
+            <input class="qf-opt-${i} w-full mt-1 rounded px-2 py-1 text-gray-800 font-bold text-sm focus:outline-none" type="text" maxlength="90"
+              value="${esc(isTF ? (i === 0 ? 'True' : i === 1 ? 'False' : '') : (v.options||[])[i]||'')}" ${isTF && i < 2 ? 'readonly' : ''}>
           </div>
         `).join('')}
       </div>
@@ -317,13 +806,25 @@ function _questionFormHTML(quizId, qData = null) {
         <div>
           <label class="text-xs text-white/60 font-bold">Correct Answer</label>
           <select class="qf-correct mt-1 rounded-lg px-3 py-2 text-gray-800 font-bold text-sm focus:outline-none">
-            ${[0,1,2,3].map(i=>`<option value="${i}" ${v.correct_index===i?'selected':''}>${TILE_LABELS[i]}</option>`).join('')}
+            ${isTF
+              ? ['True','False'].map((l,i) => `<option value="${i}" ${v.correct_index===i?'selected':''}>${l}</option>`).join('')
+              : TILE_LABELS.map((l,i) => `<option value="${i}" ${v.correct_index===i?'selected':''}>${l}</option>`).join('')
+            }
           </select>
         </div>
         <div>
           <label class="text-xs text-white/60 font-bold">Time (seconds)</label>
-          <input class="qf-time mt-1 w-24 rounded-lg px-3 py-2 text-gray-800 font-bold text-sm focus:outline-none" type="number" min="5" max="120" value="${v.time_limit_seconds}">
+          <input class="qf-time mt-1 w-24 rounded-lg px-3 py-2 text-gray-800 font-bold text-sm focus:outline-none" type="number" min="5" max="120" value="${v.time_limit_seconds || 20}">
         </div>
+      </div>
+      <div>
+        <label class="text-xs text-white/60 font-bold">Image URL <span class="font-normal opacity-60">(optional)</span></label>
+        <input class="qf-image w-full mt-1 rounded-lg px-3 py-2 text-gray-800 font-bold text-sm focus:outline-none" type="url"
+          placeholder="https://example.com/image.jpg" value="${esc(v.image_url||'')}">
+      </div>
+      <div>
+        <label class="text-xs text-white/60 font-bold">Explanation <span class="font-normal opacity-60">(shown after reveal, optional)</span></label>
+        <textarea class="qf-explanation w-full mt-1 rounded-lg px-3 py-2 text-gray-800 font-bold text-sm focus:outline-none resize-none" rows="2" maxlength="400">${esc(v.explanation||'')}</textarea>
       </div>
       <p class="qf-error hidden text-red-300 text-xs font-bold"></p>
       <div class="flex gap-2">
@@ -340,12 +841,13 @@ function showAddQuestionForm(quizId) {
   el.classList.remove('hidden');
   el.querySelector('.qf-save').onclick = () => submitAddQuestion(quizId, el);
   el.querySelector('.qf-cancel').onclick = () => { el.innerHTML=''; el.classList.add('hidden'); };
+  _setupTypeToggle(el);
 }
 
 async function submitAddQuestion(quizId, formEl) {
   const payload = _readQuestionForm(formEl);
   if (!payload) return;
-  const res = await fetch(`/host/api/quizzes/${quizId}/questions`, {
+  const res = await apiFetch(`/host/api/quizzes/${quizId}/questions`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
@@ -360,7 +862,7 @@ async function submitAddQuestion(quizId, formEl) {
 }
 
 function showEditQuestionForm(quizId, questionId) {
-  fetch(`/host/api/quizzes/${quizId}`).then(r=>r.json()).then(quiz => {
+  apiFetch(`/host/api/quizzes/${quizId}`).then(r=>r.json()).then(quiz => {
     const q = quiz.questions.find(q => q.id === questionId);
     if (!q) return;
     const editEl = document.querySelector(`.question-edit-form-${questionId}`);
@@ -370,16 +872,21 @@ function showEditQuestionForm(quizId, questionId) {
     viewEl.classList.add('hidden');
     editEl.querySelector('.qf-save').onclick = () => submitEditQuestion(quizId, questionId, editEl, viewEl);
     editEl.querySelector('.qf-cancel').onclick = () => { editEl.innerHTML=''; editEl.classList.add('hidden'); viewEl.classList.remove('hidden'); };
+    _setupTypeToggle(editEl);
   });
 }
 
 async function submitEditQuestion(quizId, questionId, formEl, viewEl) {
   const payload = _readQuestionForm(formEl);
   if (!payload) return;
-  const res = await fetch(`/host/api/questions/${questionId}`, {
+  const res = await apiFetch(`/host/api/questions/${questionId}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text: payload.text, options: payload.options, correct_index: payload.correctIndex, time_limit_seconds: payload.timeLimitSeconds }),
+    body: JSON.stringify({
+      text: payload.text, options: payload.options, correct_index: payload.correctIndex,
+      time_limit_seconds: payload.timeLimitSeconds, type: payload.type,
+      image_url: payload.imageUrl || null, explanation: payload.explanation || null,
+    }),
   });
   if (!res.ok) {
     const err = await res.json();
@@ -392,21 +899,57 @@ async function submitEditQuestion(quizId, questionId, formEl, viewEl) {
 
 function _readQuestionForm(formEl) {
   const text = formEl.querySelector('.qf-text').value.trim();
-  const options = [0,1,2,3].map(i => formEl.querySelector(`.qf-opt-${i}`).value.trim());
+  const type = formEl.querySelector('.qf-type')?.value || 'mcq';
+  const isTF = type === 'truefalse';
+  const options = isTF
+    ? ['True', 'False']
+    : [0,1,2,3].map(i => formEl.querySelector(`.qf-opt-${i}`).value.trim());
   const correctIndex = Number(formEl.querySelector('.qf-correct').value);
   const timeLimitSeconds = Number(formEl.querySelector('.qf-time').value);
+  const imageUrl = formEl.querySelector('.qf-image')?.value.trim() || null;
+  const explanation = formEl.querySelector('.qf-explanation')?.value.trim() || null;
   const errEl = formEl.querySelector('.qf-error');
 
   if (!text) { errEl.textContent = 'Question text is required'; errEl.classList.remove('hidden'); return null; }
-  if (options.some(o => !o)) { errEl.textContent = '4 answer options are required'; errEl.classList.remove('hidden'); return null; }
+  if (!isTF && options.some(o => !o)) { errEl.textContent = '4 answer options are required'; errEl.classList.remove('hidden'); return null; }
   if (timeLimitSeconds < 5 || timeLimitSeconds > 120) { errEl.textContent = 'Time must be 5–120 seconds'; errEl.classList.remove('hidden'); return null; }
   errEl.classList.add('hidden');
-  return { text, options, correctIndex, timeLimitSeconds };
+  return { text, type, options, correctIndex, timeLimitSeconds, imageUrl, explanation };
+}
+
+function _setupTypeToggle(formEl) {
+  const typeSelect = formEl.querySelector('.qf-type');
+  if (!typeSelect) return;
+  function applyMode() {
+    const isTF = typeSelect.value === 'truefalse';
+    const correctSel = formEl.querySelector('.qf-correct');
+    const TILE_LABELS  = ['Red ▲','Blue ◆','Yellow ●','Green ■'];
+    [0,1,2,3].forEach(i => {
+      const wrap = formEl.querySelector(`.qf-opt-wrap-${i}`);
+      const inp  = formEl.querySelector(`.qf-opt-${i}`);
+      if (!wrap || !inp) return;
+      if (isTF) {
+        wrap.style.display = i < 2 ? '' : 'none';
+        if (i === 0) { inp.value = 'True';  inp.readOnly = true; }
+        if (i === 1) { inp.value = 'False'; inp.readOnly = true; }
+      } else {
+        wrap.style.display = '';
+        inp.readOnly = false;
+      }
+    });
+    const labels = isTF ? ['True','False'] : TILE_LABELS;
+    const maxIdx = isTF ? 2 : 4;
+    const curVal = Number(correctSel.value);
+    correctSel.innerHTML = Array.from({length: maxIdx}, (_, i) =>
+      `<option value="${i}" ${curVal === i ? 'selected' : ''}>${labels[i]}</option>`
+    ).join('');
+  }
+  typeSelect.addEventListener('change', applyMode);
 }
 
 async function deleteQuestion(quizId, questionId) {
   if (!confirm('Delete this question?')) return;
-  await fetch(`/host/api/questions/${questionId}`, { method: 'DELETE' });
+  await apiFetch(`/host/api/questions/${questionId}`, { method: 'DELETE' });
   await reloadQuizCard(quizId);
 }
 
@@ -415,7 +958,7 @@ async function reloadQuizCard(quizId) {
   // Re-expand questions for this quiz
   const container = document.querySelector(`.question-list[data-quiz-id="${quizId}"]`);
   if (container) {
-    const res = await fetch(`/host/api/quizzes/${quizId}`);
+    const res = await apiFetch(`/host/api/quizzes/${quizId}`);
     const quiz = await res.json();
     container.dataset.loaded = '1';
     renderQuestions(quizId, quiz.questions);
@@ -437,7 +980,7 @@ async function submitRenameQuiz(quizId) {
   const card = document.querySelector(`.quiz-card[data-id="${quizId}"]`);
   const name = card.querySelector('.rename-input').value.trim();
   if (!name) return;
-  await fetch(`/host/api/quizzes/${quizId}`, {
+  await apiFetch(`/host/api/quizzes/${quizId}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name }),
@@ -447,11 +990,78 @@ async function submitRenameQuiz(quizId) {
 
 async function deleteQuiz(quizId) {
   if (!confirm('Delete this quiz and all its questions?')) return;
-  await fetch(`/host/api/quizzes/${quizId}`, { method: 'DELETE' });
+  await apiFetch(`/host/api/quizzes/${quizId}`, { method: 'DELETE' });
   await loadQuizzes();
 }
 
-// ── New quiz ──────────────────────────────────────────────────────────────────
+async function duplicateQuiz(quizId) {
+  const res = await apiFetch(`/host/api/quizzes/${quizId}/duplicate`, { method: 'POST' });
+  if (!res.ok) { const e = await res.json(); alert(e.error); return; }
+  await loadQuizzes();
+}
+
+async function loadHistory() {
+  document.getElementById('history-list').innerHTML = '<p class="text-white/40 font-bold text-center py-8">Loading…</p>';
+  const res = await apiFetch('/host/api/sessions');
+  const sessions = await res.json();
+  if (!sessions.length) {
+    document.getElementById('history-list').innerHTML = '<p class="text-white/40 font-bold text-center py-8">No completed games yet.</p>';
+    return;
+  }
+  document.getElementById('history-list').innerHTML = sessions.map(s => `
+    <div class="bg-white/10 backdrop-blur rounded-2xl p-4">
+      <div class="flex items-center gap-4 flex-wrap">
+        <div class="flex-1 min-w-0">
+          <p class="font-black text-lg truncate">${esc(s.quiz_name)}</p>
+          <p class="text-white/50 text-sm font-bold mt-0.5">
+            ${new Date(s.started_at).toLocaleString()} &middot; ${s.player_count} player${s.player_count !== 1 ? 's' : ''}
+            ${s.winner_nickname ? ` &middot; 🏆 ${esc(s.winner_nickname)} (${s.winner_score})` : ''}
+          </p>
+        </div>
+        <button onclick="toggleSessionDetail(${s.id}, this)"
+          class="bg-white/20 hover:bg-white/30 text-white font-bold px-3 py-1.5 rounded-xl text-sm transition-colors">
+          ▼ Details
+        </button>
+      </div>
+      <div id="session-detail-${s.id}" class="hidden mt-3"></div>
+    </div>
+  `).join('');
+}
+
+async function toggleSessionDetail(sessionId, btn) {
+  const el = document.getElementById(`session-detail-${sessionId}`);
+  if (el.dataset.loaded) {
+    el.classList.toggle('hidden');
+    btn.textContent = el.classList.contains('hidden') ? '▼ Details' : '▲ Details';
+    return;
+  }
+  const res = await apiFetch(`/host/api/sessions/${sessionId}`);
+  const questions = await res.json();
+  el.dataset.loaded = '1';
+  const CHIP_COLORS = ['#E21B3C','#1368CE','#D89E00','#26890C'];
+  el.innerHTML = questions.map((q, i) => {
+    const max = Math.max(...q.tally, 1);
+    return `
+      <div class="bg-white/5 rounded-xl p-3 mb-2">
+        <p class="font-bold text-sm mb-2">${i+1}. ${esc(q.text)}</p>
+        <div class="space-y-1">
+          ${q.options.map((opt, j) => `
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-black w-4 text-center">${j === q.correctIndex ? '✓' : ''}</span>
+              <div class="flex-1 bg-white/10 rounded-full h-4 overflow-hidden">
+                <div class="h-full rounded-full" style="background:${CHIP_COLORS[j]};width:${Math.round((q.tally[j]/max)*100)}%"></div>
+              </div>
+              <span class="text-xs font-bold w-20 truncate">${esc(opt)}</span>
+              <span class="text-xs font-black w-5 text-right">${q.tally[j]}</span>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  }).join('') || '<p class="text-white/40 text-sm">No submissions recorded.</p>';
+  el.classList.remove('hidden');
+  btn.textContent = '▲ Details';
+}
 
 document.getElementById('btn-new-quiz').onclick = () => {
   document.getElementById('new-quiz-form').classList.toggle('hidden');
@@ -463,7 +1073,7 @@ document.getElementById('btn-cancel-new-quiz').onclick = () => {
 document.getElementById('btn-create-quiz').onclick = async () => {
   const name = document.getElementById('new-quiz-name').value.trim();
   if (!name) { showNewQuizError('Name is required'); return; }
-  const res = await fetch('/host/api/quizzes', {
+  const res = await apiFetch('/host/api/quizzes', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name }),
@@ -482,7 +1092,7 @@ function showNewQuizError(msg) {
 // ── Start session ─────────────────────────────────────────────────────────────
 
 async function startSession(quizId, quizName) {
-  const res = await fetch('/host/api/session/start', {
+  const res = await apiFetch('/host/api/session/start', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ quizId }),
@@ -502,7 +1112,7 @@ async function startSession(quizId, quizName) {
   document.getElementById('phase-badge').textContent = 'Lobby';
   document.getElementById('question-progress').textContent = '';
   document.getElementById('question-display').innerHTML =
-    `<p class="font-bold text-white/50 text-center text-lg">Waiting for players to join…</p>`;
+    `<p class="font-bold text-white/50 text-center text-3xl">Waiting for players to join…</p>`;
   document.getElementById('tally-bars').classList.add('hidden');
   document.getElementById('btn-primary-action').textContent = 'Start First Question';
   document.getElementById('btn-end-game').classList.remove('hidden');
@@ -538,22 +1148,42 @@ function _connectSocket() {
     currentQuestionIndex = data.questionIndex;
     currentOptions = data.options;
     document.getElementById('phase-badge').textContent = 'Question';
+    document.getElementById('reveal-explanation').classList.add('hidden');
     document.getElementById('question-progress').textContent =
       `Q ${data.questionIndex + 1} / ${data.totalQuestions}`;
+    const imgHtml = data.imageUrl
+      ? `<img src="${esc(data.imageUrl)}" alt="" class="max-h-32 rounded-xl object-cover mx-auto mb-3" onerror="this.remove()">`
+      : '';
     document.getElementById('question-display').innerHTML =
-      `<p class="text-2xl font-black text-center leading-snug">${esc(data.text)}</p>`;
+      `${imgHtml}<p class="text-4xl font-black text-center leading-snug">${esc(data.text)}</p>`;
 
-    // Populate tally bars
+    // Reset tally bars (hide slots 2&3 for T/F)
+    const isTF = data.type === 'truefalse';
     const bars = document.getElementById('tally-bars');
     bars.classList.remove('hidden');
     for (let i = 0; i < 4; i++) {
+      const tile = document.getElementById(`tally-bar-${i}`)?.closest('div.rounded-xl');
+      if (tile) tile.style.display = (isTF && i >= 2) ? 'none' : '';
       document.getElementById(`opt-text-${i}`).textContent = data.options[i] || '';
       document.getElementById(`tally-count-${i}`).textContent = '0';
       document.getElementById(`tally-bar-${i}`).style.width = '0%';
+      document.getElementById(`tally-bar-${i}`).closest('div.rounded-xl').style.outline = '';
     }
+
+    // Populate participation grid
+    const players = data.players || [];
+    document.getElementById('response-chips').innerHTML = players.map(nn =>
+      `<span class="px-3 py-1.5 rounded-full text-sm font-black transition-all duration-300"
+        data-nickname="${esc(nn).replace(/"/g, '&quot;')}"
+        style="background:rgba(255,255,255,0.15);color:rgba(255,255,255,0.45)">${esc(nn)}</span>`
+    ).join('');
+    document.getElementById('response-counter').textContent = `0 / ${players.length}`;
+    document.getElementById('response-grid').style.display = 'flex';
+    document.getElementById('response-placeholder').classList.add('hidden');
 
     document.getElementById('btn-primary-action').textContent = 'Reveal ✓';
     document.getElementById('btn-end-game').classList.remove('hidden');
+    startHostRing(data.timeLimitSeconds);
   });
 
   socket.on('answer-tally-update', (data) => {
@@ -562,29 +1192,88 @@ function _connectSocket() {
       document.getElementById(`tally-count-${i}`).textContent = data.tally[i];
       document.getElementById(`tally-bar-${i}`).style.width = `${(data.tally[i] / max) * 100}%`;
     }
+    if (data.answeredNicknames) {
+      const answered = new Set(data.answeredNicknames);
+      document.querySelectorAll('#response-chips span').forEach(chip => {
+        if (answered.has(chip.dataset.nickname)) {
+          chip.style.background = '#fff';
+          chip.style.color = '#46178F';
+        }
+      });
+      document.getElementById('response-counter').textContent =
+        `${data.answeredNicknames.length} / ${document.querySelectorAll('#response-chips span').length}`;
+    }
   });
 
   socket.on('question-reveal', (data) => {
+    cancelHostRing();
+    _clearCountdown();
     currentStatus = 'reveal';
     document.getElementById('phase-badge').textContent = 'Reveal';
-    // Highlight correct bar
+    // Highlight correct answer tile
     for (let i = 0; i < 4; i++) {
       const bar = document.getElementById(`tally-bar-${i}`);
       if (i === data.correctIndex) {
         bar.closest('div.rounded-xl').style.outline = '3px solid #fff';
       }
     }
+    // Color response chips by chosen option + streak badges
+    if (data.playerResults) {
+      const CHIP_COLORS = ['#E21B3C','#1368CE','#D89E00','#26890C'];
+      document.querySelectorAll('#response-chips span').forEach(chip => {
+        const nn = chip.dataset.nickname;
+        const r  = data.playerResults[nn];
+        if (!r) return;
+        if (r.chosenIndex !== null && r.chosenIndex >= 0) {
+          chip.style.background = CHIP_COLORS[r.chosenIndex];
+          chip.style.color = '#fff';
+        } else {
+          chip.style.background = 'rgba(255,255,255,0.1)';
+          chip.style.color = 'rgba(255,255,255,0.35)';
+        }
+        if (r.bonusPoints > 0) {
+          chip.innerHTML = esc(nn) + ' 🔥';
+        }
+      });
+    }
     document.getElementById('btn-primary-action').textContent = 'Next →';
+    // If auto-advance is configured, show a countdown on the button
+    if (data.autoAdvanceSeconds > 0) {
+      _startButtonCountdown(data.autoAdvanceSeconds, 'Next →');
+    }
+    const explEl = document.getElementById('reveal-explanation');
+    if (data.explanation) {
+      explEl.textContent = data.explanation;
+      explEl.classList.remove('hidden');
+    } else {
+      explEl.classList.add('hidden');
+    }
   });
 
   socket.on('leaderboard-update', (data) => {
+    cancelHostRing();
+    _clearCountdown();
+    document.getElementById('tally-bars').classList.add('hidden');
+    document.getElementById('reveal-explanation').classList.add('hidden');
+    document.getElementById('response-grid').style.display = 'none';
+    document.getElementById('response-placeholder').classList.remove('hidden');
     currentStatus = 'leaderboard';
     document.getElementById('phase-badge').textContent = 'Leaderboard';
     document.getElementById('btn-primary-action').textContent = 'Next Question';
     renderLeaderboardSidebar(data.leaderboard);
+    // If leaderboard auto-advance is configured, show a countdown on the button
+    if (data.leaderboardDurationSeconds > 0) {
+      _startButtonCountdown(data.leaderboardDurationSeconds, 'Next Question');
+    }
   });
 
   socket.on('game-ended', (data) => {
+    cancelHostRing();
+    _clearCountdown();
+    document.getElementById('tally-bars').classList.add('hidden');
+    document.getElementById('reveal-explanation').classList.add('hidden');
+    document.getElementById('response-grid').style.display = 'none';
+    document.getElementById('response-placeholder').classList.remove('hidden');
     currentStatus = 'ended';
     document.getElementById('phase-badge').textContent = 'Ended 🏆';
     document.getElementById('btn-primary-action').textContent = 'Back to Quizzes';
@@ -648,6 +1337,7 @@ function _renderPodium(podium) {
 // ── Primary action button ─────────────────────────────────────────────────────
 
 document.getElementById('btn-primary-action').onclick = async () => {
+  _clearCountdown(); // host clicked manually — cancel any running countdown
   if (currentStatus === 'ended') {
     showPanel('library');
     socket && socket.disconnect();
@@ -656,15 +1346,30 @@ document.getElementById('btn-primary-action').onclick = async () => {
     await loadQuizzes();
     return;
   }
-  await fetch('/host/api/session/next', { method: 'POST' });
+  await apiFetch('/host/api/session/next', { method: 'POST' });
 };
 
 document.getElementById('btn-end-game').onclick = async () => {
   if (!confirm('End the game now?')) return;
-  await fetch('/host/api/session/end', { method: 'POST' });
+  await apiFetch('/host/api/session/end', { method: 'POST' });
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+
+// Read the csrf-token cookie set by the server on login
+function getCsrfToken() {
+  return document.cookie.split(';').map(c => c.trim())
+    .find(c => c.startsWith('csrf-token='))?.split('=')[1] ?? '';
+}
+
+// Drop-in fetch wrapper that injects CSRF header for state-changing requests
+function apiFetch(url, opts = {}) {
+  const headers = { ...(opts.headers || {}) };
+  if (!['GET', 'HEAD', 'OPTIONS'].includes((opts.method || 'GET').toUpperCase())) {
+    headers['X-CSRF-Token'] = getCsrfToken();
+  }
+  return fetch(url, { ...opts, headers });
+}
 
 function esc(str) {
   return String(str ?? '')

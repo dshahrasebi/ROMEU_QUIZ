@@ -44,6 +44,24 @@ let ringRaf = null;
 
 // ── Socket connection ─────────────────────────────────────────────────────────
 
+// ── Branding ──────────────────────────────────────────────────────────────────
+let brandingSettings = {};
+
+(async () => {
+  try {
+    const res = await fetch('/api/settings/public');
+    if (!res.ok) return;
+    const s = await res.json();
+    brandingSettings = s;
+    if (s.platform_name) document.title = s.platform_name + ' · Display';
+    if (s.accent_color && /^#[0-9a-fA-F]{6}$/.test(s.accent_color)) {
+      document.documentElement.style.setProperty('--accent', s.accent_color);
+    }
+  } catch { /* ignore */ }
+})();
+
+// ── Socket connection ─────────────────────────────────────────────────────────
+
 const socket = io({ transports: ['websocket'] });
 
 socket.on('connect', () => {
@@ -58,7 +76,13 @@ socket.on('display-state', (data) => {
 socket.on('lobby-update', (data) => {
   if (!currentState || currentState.status !== 'lobby') return;
   const el = document.getElementById('lobby-player-count');
-  if (el) el.textContent = `${data.playerCount} player${data.playerCount !== 1 ? 's' : ''} joined`;
+  if (!el) return;
+  if (data.playerCount !== null && data.playerCount !== undefined) {
+    el.textContent = `${data.playerCount} player${data.playerCount !== 1 ? 's' : ''} joined`;
+    el.style.display = '';
+  } else {
+    el.style.display = 'none';
+  }
 });
 
 socket.on('question-start', (data) => {
@@ -113,8 +137,16 @@ function renderPhase(state) {
 // ── Lobby ─────────────────────────────────────────────────────────────────────
 
 function renderLobby(state) {
+  const logoHtml = brandingSettings.logo_url
+    ? `<img src="${esc(brandingSettings.logo_url)}" alt="Logo" class="rounded-2xl shadow-xl mb-2" style="max-height:80px;max-width:240px;object-fit:contain" onerror="this.remove()">`
+    : '';
+  const pc = state.playerCount;
+  const pcHtml = (pc !== null && pc !== undefined)
+    ? `<p id="lobby-player-count" class="text-2xl font-bold text-white/80">${pc} player${pc !== 1 ? 's' : ''} joined</p>`
+    : `<p id="lobby-player-count" class="text-2xl font-bold text-white/80" style="display:none"></p>`;
   stage.innerHTML = `
     <div class="flex flex-col items-center gap-8 w-full max-w-2xl">
+      ${logoHtml}
       <h1 class="text-5xl font-black text-center">Join the game!</h1>
 
       ${state.qrDataUrl
@@ -130,9 +162,7 @@ function renderLobby(state) {
         <p class="text-white/60 font-bold text-lg mt-1">or scan the QR code</p>
       </div>
 
-      <p id="lobby-player-count" class="text-2xl font-bold text-white/80">
-        ${(state.playerCount || 0)} player${(state.playerCount || 0) !== 1 ? 's' : ''} joined
-      </p>
+      ${pcHtml}
     </div>
   `;
 }
@@ -145,12 +175,16 @@ const TILE_SHAPES  = ['▲','◆','●','■'];
 function renderQuestion(state) {
   const q = state.questions
     ? state.questions[state.currentQuestionIndex]
-    : { text: state.text, options: state.options, time_limit_seconds: state.timeLimitSeconds };
+    : { text: state.text, options: state.options, time_limit_seconds: state.timeLimitSeconds, type: state.type, image_url: state.imageUrl };
   if (!q) return;
 
   const tls = q.time_limit_seconds || state.timeLimitSeconds || 20;
   const circumference = 2 * Math.PI * 54;
   const elapsedMs = state.questionOpenAt ? Date.now() - state.questionOpenAt : (state.elapsedMs || 0);
+  const isTF = (q.type || state.type) === 'truefalse';
+  const imageUrl = q.image_url || state.imageUrl || null;
+  const opts = q.options || state.options || [];
+  const visibleOpts = isTF ? opts.slice(0, 2) : opts;
 
   stage.innerHTML = `
     <div class="flex flex-col w-full h-screen gap-0">
@@ -177,8 +211,9 @@ function renderQuestion(state) {
         </div>
       </div>
 
-      <!-- Question text -->
-      <div class="flex items-center justify-center flex-1 px-10">
+      <!-- Optional image + question text -->
+      <div class="flex flex-col items-center justify-center flex-1 px-10 gap-4">
+        ${imageUrl ? `<img src="${esc(imageUrl)}" alt="" class="rounded-xl object-cover" style="max-height:200px;max-width:100%" onerror="this.remove()">` : ''}
         <h2 class="font-black text-center leading-tight"
           style="font-size:clamp(2.5rem,5vw,4.5rem)">
           ${esc(q.text)}
@@ -186,10 +221,10 @@ function renderQuestion(state) {
       </div>
 
       <!-- Tiles -->
-      <div class="grid grid-cols-2 gap-4 px-6 pb-6" style="height:38vh">
-        ${(q.options || state.options || []).map((opt, i) => `
+      <div class="grid gap-4 px-6 pb-6" style="grid-template-columns:${isTF ? '1fr 1fr' : '1fr 1fr'};height:${isTF ? '22vh' : '38vh'}">
+        ${visibleOpts.map((opt, i) => `
           <div class="answer-tile" style="background:${TILE_COLORS[i]};min-height:0;cursor:default">
-            <span class="shape-icon">${TILE_SHAPES[i]}</span>
+            <span class="shape-icon">${isTF ? (i === 0 ? '✔' : '✘') : TILE_SHAPES[i]}</span>
             <span class="font-black text-xl truncate max-w-full">${esc(opt)}</span>
           </div>
         `).join('')}
@@ -216,7 +251,7 @@ function startRing(tls, alreadyElapsedMs, circumference) {
     const timeLeft = Math.max(0, remaining - elapsed);
     const ratio = timeLeft / totalMs;
     ring.style.strokeDashoffset = circumference * (1 - ratio);
-    timerLabel.textContent = Math.ceil(timeLeft / 1000);
+    timerLabel.textContent = Math.round(1000 * ratio);
     if (timeLeft > 0 && document.getElementById('ring-circle')) {
       ringRaf = requestAnimationFrame(frame);
     }
@@ -237,7 +272,8 @@ function renderReveal(state) {
     : { options: state.options || [] };
 
   const correctIdx = state.correctIndex;
-  const tally = state.answerCounts || state.tally || [0,0,0,0];
+  const showCounts = state.answerCounts !== null;
+  const tally = showCounts ? (state.answerCounts || state.tally || [0,0,0,0]) : [0,0,0,0];
   const total  = tally.reduce((a,b) => a+b, 0);
   const max    = Math.max(...tally, 1);
 
@@ -256,27 +292,32 @@ function renderReveal(state) {
             </div>
             <div class="flex-1">
               <div class="text-sm font-bold mb-1 ${i === correctIdx ? '' : 'text-white/70'}">${esc(opt)}</div>
-              <div class="bg-white/20 rounded-full h-8 overflow-hidden">
-                <div class="dist-bar-fill h-full rounded-full"
-                  id="dist-bar-${i}"
-                  style="background:${TILE_COLORS[i]};width:0%"></div>
-              </div>
+              ${showCounts ? `
+                <div class="bg-white/20 rounded-full h-8 overflow-hidden">
+                  <div class="dist-bar-fill h-full rounded-full"
+                    id="dist-bar-${i}"
+                    style="background:${TILE_COLORS[i]};width:0%"></div>
+                </div>
+              ` : ''}
             </div>
-            <span class="font-black text-xl w-10 text-right">${tally[i]}</span>
+            ${showCounts ? `<span class="font-black text-xl w-10 text-right">${tally[i]}</span>` : ''}
           </div>
         `).join('')}
       </div>
-      <p class="text-center text-white/50 font-bold mt-4">${total} answer${total !== 1 ? 's' : ''} received</p>
+      ${showCounts ? `<p class="text-center text-white/50 font-bold mt-4">${total} answer${total !== 1 ? 's' : ''} received</p>` : ''}
+      ${state.explanation ? `<p class="text-center font-bold text-white/80 mt-3 text-xl px-4">${esc(state.explanation)}</p>` : ''}
     </div>
   `;
 
   // Animate bars after render
-  setTimeout(() => {
-    for (let i = 0; i < 4; i++) {
-      const bar = document.getElementById(`dist-bar-${i}`);
-      if (bar) bar.style.width = `${(tally[i] / max) * 100}%`;
-    }
-  }, 80);
+  if (showCounts) {
+    setTimeout(() => {
+      for (let i = 0; i < 4; i++) {
+        const bar = document.getElementById(`dist-bar-${i}`);
+        if (bar) bar.style.width = `${(tally[i] / max) * 100}%`;
+      }
+    }, 80);
+  }
 }
 
 // ── Leaderboard ───────────────────────────────────────────────────────────────
@@ -368,7 +409,9 @@ function esc(str) {
   return String(str ?? '')
     .replace(/&/g,'&amp;')
     .replace(/</g,'&lt;')
-    .replace(/>/g,'&gt;');
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;')
+    .replace(/'/g,'&#x27;');
 }
 </script>
 </body>

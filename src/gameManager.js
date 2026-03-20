@@ -3,10 +3,10 @@
 const db = require('./db');
 const crypto = require('crypto');
 
-// Scoring formula: 500 + 500 * timeRatio (range 500-1000)
+// Scoring formula: 1000 * timeRatio (range 0–1000)
 function calcPoints(timeLimitSeconds, elapsedMs) {
   const ratio = Math.max(0, (timeLimitSeconds * 1000 - elapsedMs) / (timeLimitSeconds * 1000));
-  return Math.round(500 + 500 * ratio);
+  return Math.round(1000 * ratio);
 }
 
 function generatePin() {
@@ -16,6 +16,16 @@ function generatePin() {
 // ── In-memory state ───────────────────────────────────────────────────────────
 
 let state = null;
+let revealTimer = null;
+
+function _clearRevealTimer() {
+  if (revealTimer) { clearTimeout(revealTimer); revealTimer = null; }
+}
+
+function scheduleAutoReveal(delayMs, callback) {
+  _clearRevealTimer();
+  revealTimer = setTimeout(callback, delayMs);
+}
 
 /**
  * state shape:
@@ -78,6 +88,22 @@ async function startSession(quizId) {
     throw new Error('Quiz not found or has no questions');
   }
 
+  // Snapshot operational settings at session start so in-flight games are consistent
+  const rawSettings = db.getAllSettings();
+  const settings = {
+    maxPlayers:                 parseInt(rawSettings.max_players, 10)                 || 30,
+    streakBonus3:               parseInt(rawSettings.streak_bonus_3, 10)              ?? 100,
+    streakBonus5:               parseInt(rawSettings.streak_bonus_5, 10)              ?? 200,
+    allowLateJoins:             rawSettings.allow_late_joins === 'true',
+    autoAdvanceSeconds:         parseInt(rawSettings.auto_advance_seconds, 10)        || 0,
+    revealDelaySeconds:         parseInt(rawSettings.reveal_delay_seconds, 10)        || 0,
+    leaderboardDurationSeconds: parseInt(rawSettings.leaderboard_duration_seconds, 10) || 0,
+    showAnswerCounts:           rawSettings.show_answer_counts !== 'false',
+    showPlayerCount:            rawSettings.show_player_count !== 'false',
+    profanityFilter:            rawSettings.profanity_filter === 'true',
+    requireNicknameConfirm:     rawSettings.require_nickname_confirm === 'true',
+  };
+
   state = {
     sessionId: session.id,
     pin,
@@ -89,6 +115,7 @@ async function startSession(quizId) {
     questionOpenAt: null,
     answers: new Map(),
     timer: null,
+    settings,
   };
 
   _persist();
@@ -97,8 +124,9 @@ async function startSession(quizId) {
 
 function addPlayer(socketId, nickname) {
   if (!state) throw new Error('No active session');
-  if (state.status !== 'lobby') throw new Error('Game already in progress');
-  if (state.players.size >= 30) throw new Error('Session full (max 30 players)');
+  const maxPlayers = state.settings?.maxPlayers ?? 30;
+  if (state.status !== 'lobby' && !state.settings?.allowLateJoins) throw new Error('Game already in progress');
+  if (state.players.size >= maxPlayers) throw new Error(`Session full (max ${maxPlayers} players)`);
 
   // Check for duplicate nickname
   for (const p of state.players.values()) {
@@ -112,6 +140,7 @@ function addPlayer(socketId, nickname) {
     playerId: player.id,
     nickname,
     score: 0,
+    streak: 0,
     connected: true,
   });
   return player;
@@ -174,9 +203,19 @@ function submitAnswer(socketId, optionIndex) {
   const elapsedMs = Date.now() - state.questionOpenAt;
 
   const isCorrect = optionIndex === question.correct_index;
-  const points = isCorrect ? calcPoints(question.time_limit_seconds, elapsedMs) : 0;
+  const bonus3 = state.settings?.streakBonus3 ?? 100;
+  const bonus5 = state.settings?.streakBonus5 ?? 200;
+  let bonusPoints = 0;
+  if (isCorrect) {
+    player.streak = (player.streak || 0) + 1;
+    if (player.streak >= 5)      bonusPoints = bonus5;
+    else if (player.streak >= 3) bonusPoints = bonus3;
+  } else {
+    player.streak = 0;
+  }
+  const points = isCorrect ? calcPoints(question.time_limit_seconds, elapsedMs) + bonusPoints : 0;
 
-  state.answers.set(player.playerId, { optionIndex, elapsedMs, points, isCorrect });
+  state.answers.set(player.playerId, { optionIndex, elapsedMs, points, isCorrect, bonusPoints });
 
   db.createAnswerSubmission(
     state.sessionId,
@@ -196,6 +235,7 @@ function submitAnswer(socketId, optionIndex) {
 }
 
 function revealAnswer() {
+  _clearRevealTimer();
   if (!state || state.status !== 'question') throw new Error('Not in question phase');
   state.status = 'reveal';
   _persist();
@@ -276,6 +316,7 @@ function restoreFromDb(sessionRow) {
       playerId: p.id,
       nickname: p.nickname,
       score: p.score,
+      streak: 0,
       connected: false, // all disconnected on restart
     });
   }
@@ -328,13 +369,17 @@ function _buildRevealPayload() {
     playerResults[player.nickname] = {
       correct: ans !== undefined && ans.optionIndex === q.correct_index,
       pointsEarned: ans?.points ?? 0,
+      bonusPoints: ans?.bonusPoints ?? 0,
+      streak: player.streak || 0,
+      chosenIndex: ans?.optionIndex ?? null,
       newScore: player.score,
     };
   }
 
   return {
     correctIndex: q.correct_index,
-    answerCounts,
+    explanation: q.explanation || null,
+    answerCounts: state.settings?.showAnswerCounts !== false ? answerCounts : null,
     totalAnswers: state.answers.size,
     totalPlayers: state.players.size,
     playerResults,
@@ -359,4 +404,5 @@ module.exports = {
   getCurrentQuestionForHost,
   getCurrentQuestionForPlayer,
   restoreFromDb,
+  scheduleAutoReveal,
 };

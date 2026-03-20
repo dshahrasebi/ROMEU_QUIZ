@@ -1,5 +1,88 @@
 'use strict';
 
+const { isProfane } = require('./profanity');
+
+// ── Module-level auto-advance timers ─────────────────────────────────────────
+let _autoAdvanceTimer = null; // reveal → leaderboard
+let _leaderboardTimer = null; // leaderboard → next question / end
+
+function _clearAutoTimers() {
+  if (_autoAdvanceTimer) { clearTimeout(_autoAdvanceTimer); _autoAdvanceTimer = null; }
+  if (_leaderboardTimer)  { clearTimeout(_leaderboardTimer);  _leaderboardTimer = null; }
+}
+
+// Locks state to 'reveal' immediately, then emits after optional delay.
+// Also schedules auto-advance to leaderboard if configured.
+function _revealWithDelay(io, pin, gameManager) {
+  const cur = gameManager.getState();
+  if (!cur || cur.status !== 'question') return;
+  const delaySecs   = cur.settings?.revealDelaySeconds  || 0;
+  const advanceSecs = cur.settings?.autoAdvanceSeconds  || 0;
+  const payload = gameManager.revealAnswer(); // state → 'reveal'
+  if (!payload) return;
+
+  function doEmit() {
+    // Attach auto-advance metadata so the host UI can show a countdown
+    payload.autoAdvanceSeconds = advanceSecs;
+    io.to(`session:${pin}`).emit('question-reveal', payload);
+    if (advanceSecs > 0) {
+      _autoAdvanceTimer = setTimeout(() => {
+        _autoAdvanceTimer = null;
+        const s = gameManager.getState();
+        if (s && s.status === 'reveal') _emitLeaderboard(io, s.pin, gameManager);
+      }, advanceSecs * 1000);
+    }
+  }
+
+  if (delaySecs > 0) setTimeout(doEmit, delaySecs * 1000);
+  else doEmit();
+}
+
+// Shows leaderboard and optionally auto-advances after leaderboard duration.
+function _emitLeaderboard(io, pin, gameManager) {
+  const leaderboard = gameManager.showLeaderboard();
+  const s = gameManager.getState();
+  const durSecs = s?.settings?.leaderboardDurationSeconds || 0;
+  io.to(`session:${pin}`).emit('leaderboard-update', { leaderboard, leaderboardDurationSeconds: durSecs });
+  if (durSecs > 0) {
+    _leaderboardTimer = setTimeout(() => {
+      _leaderboardTimer = null;
+      const cur = gameManager.getState();
+      if (!cur || cur.status !== 'leaderboard') return;
+      if (cur.currentQuestionIndex + 1 >= cur.questions.length) {
+        const final = gameManager.endSession();
+        io.to(`session:${cur.pin}`).emit('game-ended', {
+          podium: final.slice(0, 3), allPlayers: final, archived: false,
+        });
+      } else {
+        _startNextQuestion(io, cur.pin, gameManager);
+      }
+    }, durSecs * 1000);
+  }
+}
+
+// Advances to the next question and schedules timer-based auto-reveal.
+function _startNextQuestion(io, pin, gameManager) {
+  const s = gameManager.nextQuestion();
+  const q = s.questions[s.currentQuestionIndex];
+  io.to(`session:${pin}`).emit('question-start', {
+    questionIndex:  s.currentQuestionIndex,
+    totalQuestions: s.questions.length,
+    text:           q.text,
+    options:        q.options,
+    timeLimitSeconds: q.time_limit_seconds,
+    type:    q.type || 'mcq',
+    imageUrl: q.image_url || null,
+    questionOpenAt: s.questionOpenAt,
+    players: Array.from(s.players.values()).filter(p => p.connected).map(p => p.nickname),
+  });
+  gameManager.scheduleAutoReveal(q.time_limit_seconds * 1000, () => {
+    const cur = gameManager.getState();
+    if (!cur || cur.status !== 'question') return;
+    _revealWithDelay(io, cur.pin, gameManager);
+  });
+}
+
 /**
  * registerHandlers — wires all Socket.io events for host, display, and player.
  * Called once from server.js after io is created.
@@ -58,8 +141,8 @@ function registerHandlers(io, db, gameManager, sessionMiddleware) {
       if (!state || state.pin !== pin || state.status !== 'question') {
         return socket.emit('error', { message: 'Cannot reveal now' });
       }
-      const payload = gameManager.revealAnswer();
-      io.to(`session:${pin}`).emit('question-reveal', payload);
+      _clearAutoTimers();
+      _revealWithDelay(io, pin, gameManager);
     });
 
     socket.on('host-end', ({ pin } = {}) => {
@@ -96,7 +179,7 @@ function registerHandlers(io, db, gameManager, sessionMiddleware) {
         currentQuestionIndex: state.currentQuestionIndex,
         questionCount: state.questions.length,
         qrDataUrl: state.qrDataUrl || null,
-        playerCount: state.players.size,
+        playerCount: state.settings?.showPlayerCount !== false ? state.players.size : null,
         players: Array.from(state.players.values()).map(p => ({
           nickname: p.nickname,
           score: p.score,
@@ -126,16 +209,22 @@ function registerHandlers(io, db, gameManager, sessionMiddleware) {
       if (!state || state.pin !== pin) {
         return socket.emit('join-error', { message: 'Session not found' });
       }
+      const maxPlayers = state.settings?.maxPlayers ?? 30;
       if (state.status !== 'lobby') {
-        return socket.emit('join-error', { message: 'Session has already started' });
+        if (!state.settings?.allowLateJoins) {
+          return socket.emit('join-error', { message: 'Session has already started' });
+        }
       }
-      if (state.players.size >= 30) {
+      if (state.players.size >= maxPlayers) {
         return socket.emit('join-error', { message: 'Session is full' });
       }
 
       const trimmed = (nickname ?? '').trim();
       if (!trimmed || trimmed.length > 20) {
         return socket.emit('join-error', { message: 'Nickname must be 1–20 chars' });
+      }
+      if (state.settings?.profanityFilter && isProfane(trimmed)) {
+        return socket.emit('join-error', { message: 'Nickname contains inappropriate language' });
       }
 
       // Check for existing player with same nickname (case-insensitive reconnect)
@@ -161,7 +250,7 @@ function registerHandlers(io, db, gameManager, sessionMiddleware) {
         socket.emit('join-success', {
           playerId: existingEntry.playerId,
           nickname: existingEntry.nickname,
-          playerCount: state.players.size,
+          playerCount: state.settings?.showPlayerCount !== false ? state.players.size : null,
         });
       } else {
         // New player
@@ -170,6 +259,7 @@ function registerHandlers(io, db, gameManager, sessionMiddleware) {
           playerId: player.id,
           nickname: trimmed,
           score: 0,
+          streak: 0,
           connected: true,
           socketId: socket.id,
         });
@@ -178,14 +268,14 @@ function registerHandlers(io, db, gameManager, sessionMiddleware) {
         socket.emit('join-success', {
           playerId: player.id,
           nickname: trimmed,
-          playerCount: state.players.size,
+          playerCount: state.settings?.showPlayerCount !== false ? state.players.size : null,
         });
       }
 
       // Broadcast lobby update to everyone in session
       io.to(`session:${pin}`).emit('lobby-update', {
         players: Array.from(state.players.values()).map(p => ({ nickname: p.nickname })),
-        playerCount: state.players.size,
+        playerCount: state.settings?.showPlayerCount !== false ? state.players.size : null,
       });
     });
 
@@ -207,18 +297,21 @@ function registerHandlers(io, db, gameManager, sessionMiddleware) {
         if (ans.optionIndex >= 0 && ans.optionIndex <= 3) tally[ans.optionIndex]++;
       }
       const connectedCount = Array.from(state.players.values()).filter(p => p.connected).length;
+      const answeredNicknames = [];
+      for (const player of state.players.values()) {
+        if (state.answers.has(player.playerId)) answeredNicknames.push(player.nickname);
+      }
       io.to(`host:${pin}`).emit('answer-tally-update', {
         tally,
         totalAnswered: state.answers.size,
         totalPlayers: connectedCount,
+        answeredNicknames,
       });
 
       // Auto-reveal when all connected players answered
       if (state.answers.size >= connectedCount && connectedCount > 0) {
-        const revealPayload = gameManager.revealAnswer();
-        if (revealPayload) {
-          io.to(`session:${pin}`).emit('question-reveal', revealPayload);
-        }
+        _clearAutoTimers();
+        _revealWithDelay(io, pin, gameManager);
       }
     });
 
@@ -232,7 +325,7 @@ function registerHandlers(io, db, gameManager, sessionMiddleware) {
         if (state) {
           io.to(`session:${state.pin}`).emit('lobby-update', {
             players: Array.from(state.players.values()).map(p => ({ nickname: p.nickname })),
-            playerCount: state.players.size,
+            playerCount: state.settings?.showPlayerCount !== false ? state.players.size : null,
           });
         }
       }
@@ -248,29 +341,22 @@ function _handleHostNext(io, pin, gameManager, socket) {
 
   switch (state.status) {
     case 'lobby': {
-      const s = gameManager.nextQuestion();
-      const q = s.questions[s.currentQuestionIndex];
-      io.to(`session:${pin}`).emit('question-start', {
-        questionIndex: s.currentQuestionIndex,
-        totalQuestions: s.questions.length,
-        text: q.text,
-        options: q.options,
-        timeLimitSeconds: q.time_limit_seconds,
-        questionOpenAt: s.questionOpenAt,
-      });
+      _clearAutoTimers();
+      _startNextQuestion(io, pin, gameManager);
       break;
     }
     case 'question': {
-      const payload = gameManager.revealAnswer();
-      io.to(`session:${pin}`).emit('question-reveal', payload);
+      _clearAutoTimers();
+      _revealWithDelay(io, pin, gameManager);
       break;
     }
     case 'reveal': {
-      const leaderboard = gameManager.showLeaderboard();
-      io.to(`session:${pin}`).emit('leaderboard-update', { leaderboard });
+      _clearAutoTimers();
+      _emitLeaderboard(io, pin, gameManager);
       break;
     }
     case 'leaderboard': {
+      _clearAutoTimers();
       const nextIdx = state.currentQuestionIndex + 1;
       if (nextIdx >= state.questions.length) {
         const final = gameManager.endSession();
@@ -280,16 +366,7 @@ function _handleHostNext(io, pin, gameManager, socket) {
           archived: false,
         });
       } else {
-        const s = gameManager.nextQuestion();
-        const q = s.questions[s.currentQuestionIndex];
-        io.to(`session:${pin}`).emit('question-start', {
-          questionIndex: s.currentQuestionIndex,
-          totalQuestions: s.questions.length,
-          text: q.text,
-          options: q.options,
-          timeLimitSeconds: q.time_limit_seconds,
-          questionOpenAt: s.questionOpenAt,
-        });
+        _startNextQuestion(io, pin, gameManager);
       }
       break;
     }
@@ -298,4 +375,10 @@ function _handleHostNext(io, pin, gameManager, socket) {
   }
 }
 
-module.exports = { registerHandlers };
+module.exports = {
+  registerHandlers,
+  revealWithDelay:    _revealWithDelay,
+  emitLeaderboard:   _emitLeaderboard,
+  startNextQuestion: _startNextQuestion,
+  clearAutoTimers:   _clearAutoTimers,
+};

@@ -65,7 +65,22 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_questions_quiz      ON questions(quiz_id);
   CREATE INDEX IF NOT EXISTS idx_players_session     ON players(session_id);
   CREATE INDEX IF NOT EXISTS idx_submissions_session_question ON answer_submissions(session_id, question_id);
+
+  CREATE TABLE IF NOT EXISTS settings (
+    key   TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+  );
 `);
+
+// ── Schema migrations (idempotent) ───────────────────────────────────────────────────
+
+for (const sql of [
+  `ALTER TABLE questions ADD COLUMN type        TEXT NOT NULL DEFAULT 'mcq'`,
+  `ALTER TABLE questions ADD COLUMN image_url   TEXT`,
+  `ALTER TABLE questions ADD COLUMN explanation TEXT`,
+]) {
+  try { db.exec(sql); } catch { /* column already exists */ }
+}
 
 // ── Quiz helpers ──────────────────────────────────────────────────────────────
 
@@ -94,19 +109,21 @@ const deleteQuiz     = db.prepare('DELETE FROM quizzes WHERE id = ?');
 
 // ── Question helpers ──────────────────────────────────────────────────────────
 
-const addQuestion = (quizId, text, options, correctIndex, timeLimitSeconds) => {
+const getQuestionById = db.prepare('SELECT * FROM questions WHERE id = ?');
+
+const addQuestion = (quizId, text, options, correctIndex, timeLimitSeconds, type = 'mcq', imageUrl = null, explanation = null) => {
   const maxOrder = db.prepare(
     'SELECT COALESCE(MAX(sort_order), -1) AS m FROM questions WHERE quiz_id = ?'
   ).get(quizId).m;
   return db.prepare(`
-    INSERT INTO questions (quiz_id, text, options, correct_index, time_limit_seconds, sort_order)
-    VALUES (?, ?, ?, ?, ?, ?)
+    INSERT INTO questions (quiz_id, text, options, correct_index, time_limit_seconds, sort_order, type, image_url, explanation)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     RETURNING *
-  `).get(quizId, text, JSON.stringify(options), correctIndex, timeLimitSeconds, maxOrder + 1);
+  `).get(quizId, text, JSON.stringify(options), correctIndex, timeLimitSeconds, maxOrder + 1, type, imageUrl, explanation);
 };
 
 const updateQuestion = (id, fields) => {
-  const allowed = ['text', 'options', 'correct_index', 'time_limit_seconds'];
+  const allowed = ['text', 'options', 'correct_index', 'time_limit_seconds', 'type', 'image_url', 'explanation'];
   const sets = [];
   const vals = [];
   for (const [k, v] of Object.entries(fields)) {
@@ -172,16 +189,107 @@ const createAnswerSubmission = db.prepare(`
   RETURNING *
 `);
 
+// ── Analytics helpers ────────────────────────────────────────────────────────────────
+
+const getCompletedSessions = () =>
+  db.prepare(`
+    SELECT s.id, s.pin, s.status, s.started_at, s.ended_at, q.name AS quiz_name,
+      (SELECT COUNT(*) FROM players WHERE session_id = s.id) AS player_count,
+      (SELECT nickname FROM players WHERE session_id = s.id ORDER BY score DESC LIMIT 1) AS winner_nickname,
+      (SELECT MAX(score) FROM players WHERE session_id = s.id) AS winner_score
+    FROM sessions s
+    JOIN quizzes q ON q.id = s.quiz_id
+    WHERE s.status = 'ended'
+    ORDER BY s.started_at DESC
+    LIMIT 50
+  `).all();
+
+const getSessionAnswerBreakdown = (sessionId) => {
+  const questions = db.prepare(`
+    SELECT q.id, q.text, q.options, q.correct_index, q.sort_order
+    FROM questions q
+    JOIN sessions s ON s.quiz_id = q.quiz_id
+    WHERE s.id = ?
+    ORDER BY q.sort_order ASC, q.id ASC
+  `).all(sessionId);
+  const submissions = db.prepare(`
+    SELECT question_id, option_index, COUNT(*) AS count
+    FROM answer_submissions
+    WHERE session_id = ?
+    GROUP BY question_id, option_index
+  `).all(sessionId);
+  return questions.map(q => {
+    const opts = JSON.parse(q.options);
+    const tally = Array(opts.length).fill(0);
+    for (const s of submissions) {
+      if (s.question_id === q.id && s.option_index >= 0 && s.option_index < tally.length)
+        tally[s.option_index] = s.count;
+    }
+    return { id: q.id, text: q.text, options: opts, correctIndex: q.correct_index, tally, total: tally.reduce((a, b) => a + b, 0) };
+  });
+};
+
+// ── Settings helpers ──────────────────────────────────────────────────────────
+
+const SETTING_DEFAULTS = {
+  platform_name:                'ROMEU Quiz',
+  logo_url:                     '',
+  accent_color:                 '#7c3aed',
+  default_time_limit:           '20',
+  max_players:                  '30',
+  streak_bonus_3:               '100',
+  streak_bonus_5:               '200',
+  allow_late_joins:             'false',
+  require_nickname_confirm:     'false',
+  profanity_filter:             'false',
+  auto_advance_seconds:         '0',
+  reveal_delay_seconds:         '0',
+  leaderboard_duration_seconds: '0',
+  show_answer_counts:           'true',
+  show_player_count:            'true',
+  session_timeout_hours:        '4',
+  max_login_attempts:           '20',
+};
+
+const getAllSettings = () => {
+  const rows = db.prepare('SELECT key, value FROM settings').all();
+  const result = { ...SETTING_DEFAULTS };
+  for (const { key, value } of rows) {
+    if (key in result) result[key] = value;
+  }
+  return result;
+};
+
+const _setSettingStmt = db.prepare(
+  'INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value'
+);
+
+const setSettings = (obj) => {
+  const upsert = db.transaction((entries) => {
+    for (const [key, value] of entries) {
+      _setSettingStmt.run(key, String(value));
+    }
+  });
+  upsert(Object.entries(obj));
+};
+
 module.exports = {
+  SETTING_DEFAULTS,
   // quiz
   createQuiz:    (name) => createQuiz.get(name),
   getAllQuizzes:  () => getAllQuizzes.all(),
   getQuizById,
   updateQuizName: (id, name) => updateQuizName.run(name, id),
-  deleteQuiz:    (id) => deleteQuiz.run(id),
+  deleteQuiz: (id) => {
+    // sessions.quiz_id has no ON DELETE CASCADE, so manually remove sessions first
+    // (players and answer_submissions cascade from sessions)
+    db.prepare('DELETE FROM sessions WHERE quiz_id = ?').run(id);
+    return deleteQuiz.run(id);
+  },
   // question
   addQuestion,
   updateQuestion,
+  getQuestionById: (id) => getQuestionById.get(id),
   deleteQuestion: (id) => deleteQuestion.run(id),
   // session
   createSession:        (pin, quizId) => createSession.get(pin, quizId),
@@ -199,4 +307,17 @@ module.exports = {
   // submission
   createAnswerSubmission: (sessionId, playerId, questionId, optionIndex, elapsedMs, pointsEarned) =>
     createAnswerSubmission.get(sessionId, playerId, questionId, optionIndex, elapsedMs, pointsEarned),
+  // analytics
+  getCompletedSessions,
+  getSessionAnswerBreakdown,
+  // settings
+  getSetting: (key) => {
+    const row = db.prepare('SELECT value FROM settings WHERE key = ?').get(key);
+    return row ? row.value : null;
+  },
+  setSetting: (key, value) => {
+    db.prepare('INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(key, value);
+  },
+  getAllSettings,
+  setSettings,
 };
