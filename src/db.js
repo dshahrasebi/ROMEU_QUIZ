@@ -249,6 +249,15 @@ const SETTING_DEFAULTS = {
   show_player_count:            'true',
   session_timeout_hours:        '4',
   max_login_attempts:           '20',
+  // ── Language ─────────────────────────────────────────────────────────────
+  ui_language:                  'en',
+  // ── Audio (display screen only) ────────────────────────────────────────
+  sound_enabled:                'true',
+  sfx_volume:                   '80',
+  music_volume:                 '50',
+  sfx_pack:                     'classic',
+  bgm_lobby:                    'lobby-chill',
+  bgm_question:                 'question-action',
 };
 
 const getAllSettings = () => {

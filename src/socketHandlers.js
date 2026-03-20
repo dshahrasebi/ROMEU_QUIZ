@@ -1,6 +1,10 @@
 'use strict';
 
 const { isProfane } = require('./profanity');
+const { t: _t }     = require('./i18n-server');
+// Helper: read current language from DB (db injected via registerHandlers)
+let _db = null;
+const t = (key, vars = {}) => _t(key, vars, _db ? (_db.getSetting('ui_language') || 'en') : 'en');
 
 // ── Module-level auto-advance timers ─────────────────────────────────────────
 let _autoAdvanceTimer = null; // reveal → leaderboard
@@ -88,6 +92,7 @@ function _startNextQuestion(io, pin, gameManager) {
  * Called once from server.js after io is created.
  */
 function registerHandlers(io, db, gameManager, sessionMiddleware) {
+  _db = db; // make language readable from t()
 
   // Bridge express-session onto Socket.io requests so socket.request.session works
   io.use((socket, next) => {
@@ -100,12 +105,12 @@ function registerHandlers(io, db, gameManager, sessionMiddleware) {
 
     socket.on('host-join', ({ pin } = {}) => {
       if (!socket.request.session || !socket.request.session.isHost) {
-        return socket.emit('error', { message: 'Unauthorized' });
+        return socket.emit('error', { message: t('sock.unauthorized') });
       }
 
       const state = gameManager.getState();
       if (!state || state.pin !== pin) {
-        return socket.emit('error', { message: 'No active session for that PIN' });
+        return socket.emit('error', { message: t('sock.no_active_pin') });
       }
 
       socket.join(`session:${pin}`);
@@ -128,18 +133,18 @@ function registerHandlers(io, db, gameManager, sessionMiddleware) {
 
     socket.on('host-next', ({ pin } = {}) => {
       if (!socket.request.session || !socket.request.session.isHost) {
-        return socket.emit('error', { message: 'Unauthorized' });
+        return socket.emit('error', { message: t('sock.unauthorized') });
       }
       _handleHostNext(io, pin, gameManager, socket);
     });
 
     socket.on('host-reveal', ({ pin } = {}) => {
       if (!socket.request.session || !socket.request.session.isHost) {
-        return socket.emit('error', { message: 'Unauthorized' });
+        return socket.emit('error', { message: t('sock.unauthorized') });
       }
       const state = gameManager.getState();
       if (!state || state.pin !== pin || state.status !== 'question') {
-        return socket.emit('error', { message: 'Cannot reveal now' });
+        return socket.emit('error', { message: t('sock.cannot_reveal') });
       }
       _clearAutoTimers();
       _revealWithDelay(io, pin, gameManager);
@@ -147,11 +152,11 @@ function registerHandlers(io, db, gameManager, sessionMiddleware) {
 
     socket.on('host-end', ({ pin } = {}) => {
       if (!socket.request.session || !socket.request.session.isHost) {
-        return socket.emit('error', { message: 'Unauthorized' });
+        return socket.emit('error', { message: t('sock.unauthorized') });
       }
       const state = gameManager.getState();
       if (!state || state.pin !== pin) {
-        return socket.emit('error', { message: 'No active session' });
+        return socket.emit('error', { message: t('sock.no_active') });
       }
       const finalLeaderboard = gameManager.endSession();
       io.to(`session:${pin}`).emit('game-ended', {
@@ -207,27 +212,19 @@ function registerHandlers(io, db, gameManager, sessionMiddleware) {
       const state = gameManager.getState();
 
       if (!state || state.pin !== pin) {
-        return socket.emit('join-error', { message: 'Session not found' });
-      }
-      const maxPlayers = state.settings?.maxPlayers ?? 30;
-      if (state.status !== 'lobby') {
-        if (!state.settings?.allowLateJoins) {
-          return socket.emit('join-error', { message: 'Session has already started' });
-        }
-      }
-      if (state.players.size >= maxPlayers) {
-        return socket.emit('join-error', { message: 'Session is full' });
+        return socket.emit('join-error', { message: t('join.session_not_found') });
       }
 
       const trimmed = (nickname ?? '').trim();
       if (!trimmed || trimmed.length > 20) {
-        return socket.emit('join-error', { message: 'Nickname must be 1–20 chars' });
+        return socket.emit('join-error', { message: t('join.nickname_length') });
       }
       if (state.settings?.profanityFilter && isProfane(trimmed)) {
-        return socket.emit('join-error', { message: 'Nickname contains inappropriate language' });
+        return socket.emit('join-error', { message: t('join.profanity') });
       }
 
-      // Check for existing player with same nickname (case-insensitive reconnect)
+      // Look up existing player FIRST — reconnecting players must always be
+      // allowed through regardless of game status or late-join settings.
       let existingEntry = null;
       for (const [, p] of state.players.entries()) {
         if (p.nickname.toLowerCase() === trimmed.toLowerCase()) {
@@ -237,7 +234,7 @@ function registerHandlers(io, db, gameManager, sessionMiddleware) {
       }
 
       if (existingEntry) {
-        // Reconnect path — update socket mapping
+        // ── Reconnect path — update socket mapping ──────────────────────────
         const oldSocketId = existingEntry.socketId;
         if (oldSocketId) state.players.delete(oldSocketId);
         existingEntry.socketId = socket.id;
@@ -253,7 +250,17 @@ function registerHandlers(io, db, gameManager, sessionMiddleware) {
           playerCount: state.settings?.showPlayerCount !== false ? state.players.size : null,
         });
       } else {
-        // New player
+        // ── New player — enforce late-join and capacity gates ────────────────
+        const maxPlayers = state.settings?.maxPlayers ?? 30;
+        if (state.status !== 'lobby') {
+          if (!state.settings?.allowLateJoins) {
+            return socket.emit('join-error', { message: t('join.already_started') });
+          }
+        }
+        if (state.players.size >= maxPlayers) {
+          return socket.emit('join-error', { message: t('join.session_full') });
+        }
+
         const player = db.createPlayer(state.sessionId, trimmed, socket.id);
         state.players.set(socket.id, {
           playerId: player.id,
@@ -282,7 +289,7 @@ function registerHandlers(io, db, gameManager, sessionMiddleware) {
     socket.on('submit-answer', ({ optionIndex } = {}) => {
       const state = gameManager.getState();
       if (!state || state.status !== 'question') {
-        return socket.emit('answer-locked', { message: 'Question is no longer accepting answers' });
+        return socket.emit('answer-locked', { message: t('join.answer_locked') });
       }
 
       const result = gameManager.submitAnswer(socket.id, Number(optionIndex));
@@ -336,7 +343,7 @@ function registerHandlers(io, db, gameManager, sessionMiddleware) {
 function _handleHostNext(io, pin, gameManager, socket) {
   const state = gameManager.getState();
   if (!state || state.pin !== pin) {
-    return socket.emit('error', { message: 'No active session' });
+    return socket.emit('error', { message: t('sock.no_active') });
   }
 
   switch (state.status) {
@@ -371,7 +378,7 @@ function _handleHostNext(io, pin, gameManager, socket) {
       break;
     }
     default:
-      socket.emit('error', { message: `Cannot advance from status: ${state.status}` });
+      socket.emit('error', { message: t('sock.bad_advance', { status: state.status }) });
   }
 }
 

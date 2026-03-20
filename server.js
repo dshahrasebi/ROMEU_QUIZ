@@ -20,6 +20,9 @@ const rateLimit = require('express-rate-limit');
 
 const db          = require('./src/db');
 const gameManager = require('./src/gameManager');
+const { t: _t }   = require('./src/i18n-server');
+// Helper: read current language from DB and call t()
+const t = (key, vars = {}) => _t(key, vars, db.getSetting('ui_language') || 'en');
 const {
   registerHandlers,
   revealWithDelay,
@@ -73,7 +76,7 @@ function loginLimiter(req, res, next) {
   }
   entry.count++;
   if (entry.count > maxAttempts) {
-    return res.status(429).json({ error: 'Too many login attempts. Try again in 15 minutes.' });
+    return res.status(429).json({ error: t('err.ratelimit') });
   }
   next();
 }
@@ -96,18 +99,25 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
 // ── Static files ──────────────────────────────────────────────────────────────
-
-app.use('/host',       express.static(path.join(__dirname, 'public/host')));
-app.use('/display',    express.static(path.join(__dirname, 'public/display')));
-app.use('/play',       express.static(path.join(__dirname, 'public/play')));
-app.use('/shared.css', express.static(path.join(__dirname, 'public/shared.css')));
+// Prevent browsers from storing stale copies — forces a fresh fetch every time.
+const staticOpts = { etag: true, lastModified: true, setHeaders: (res) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+}};
+app.use('/host',       express.static(path.join(__dirname, 'public/host'), staticOpts));
+app.use('/display',    express.static(path.join(__dirname, 'public/display'), staticOpts));
+app.use('/play',       express.static(path.join(__dirname, 'public/play'), staticOpts));
+app.use('/shared.css', express.static(path.join(__dirname, 'public/shared.css'), staticOpts));
+app.use('/audio.js',   express.static(path.join(__dirname, 'public/audio.js'), staticOpts));
+app.use('/audio',      express.static(path.join(__dirname, 'public/audio'), staticOpts));
+app.use('/i18n.js',    express.static(path.join(__dirname, 'public/i18n.js'), staticOpts));
+app.use('/lang.js',    express.static(path.join(__dirname, 'public/lang.js'), staticOpts));
 
 // ── Auth middleware ───────────────────────────────────────────────────────────
 
 function requireHost(req, res, next) {
   if (req.session.isHost) return next();
   if (req.headers.accept && req.headers.accept.includes('application/json')) {
-    return res.status(401).json({ error: 'Unauthorized' });
+    return res.status(401).json({ error: t('err.unauthorized') });
   }
   return res.redirect('/host/login');
 }
@@ -123,7 +133,7 @@ function requireCsrf(req, res, next) {
   if (!req.session?.isHost) return next();
   const token = req.headers['x-csrf-token'];
   if (!token || token !== req.session.csrfToken) {
-    return res.status(403).json({ error: 'Invalid or missing CSRF token' });
+    return res.status(403).json({ error: t('err.csrf') });
   }
   return next();
 }
@@ -196,13 +206,13 @@ app.use('/host/api', requireCsrf);
 app.post('/host/api/settings/password', requireHost, (req, res) => {
   const { currentPassword, newPassword, confirmPassword } = req.body;
   if (!currentPassword || !newPassword || !confirmPassword) {
-    return res.status(400).json({ error: 'All fields are required' });
+    return res.status(400).json({ error: t('err.pw.fields_required') });
   }
   if (newPassword !== confirmPassword) {
-    return res.status(400).json({ error: 'New passwords do not match' });
+    return res.status(400).json({ error: t('err.pw.mismatch') });
   }
   if (newPassword.length < 8) {
-    return res.status(400).json({ error: 'New password must be at least 8 characters' });
+    return res.status(400).json({ error: t('err.pw.too_short') });
   }
   const effective = getEffectivePassword();
   const expBuf = Buffer.alloc(Math.max(effective.length, currentPassword.length));
@@ -210,7 +220,7 @@ app.post('/host/api/settings/password', requireHost, (req, res) => {
   const prvBuf = Buffer.alloc(expBuf.length);
   Buffer.from(currentPassword).copy(prvBuf);
   if (!crypto.timingSafeEqual(expBuf, prvBuf)) {
-    return res.status(400).json({ error: 'Current password is incorrect' });
+    return res.status(400).json({ error: t('err.pw.incorrect') });
   }
   db.setSetting('host_password', newPassword);
   return res.json({ ok: true });
@@ -237,25 +247,36 @@ const SETTING_RULES = {
   show_player_count:            { type: 'bool' },
   session_timeout_hours:        { type: 'int',     min: 1,   max: 24  },
   max_login_attempts:           { type: 'int',     min: 3,   max: 100 },
+  // ── Audio ────────────────────────────────────────────────────────────────
+  sound_enabled:                { type: 'bool' },
+  sfx_volume:                   { type: 'int',     min: 0,   max: 100 },
+  music_volume:                 { type: 'int',     min: 0,   max: 100 },
+  sfx_pack:                     { type: 'enum',    values: ['classic','modern','punchy','off'] },
+  bgm_lobby:                    { type: 'enum',    values: ['lobby-chill','lobby-upbeat','off'] },
+  bgm_question:                 { type: 'enum',    values: ['question-action','question-electronic','off'] },
+  // ── Language ────────────────────────────────────────────────────────────────
+  ui_language:                  { type: 'enum',    values: ['en','es'] },
 };
 
 function validateSettingValue(key, value) {
   const rule = SETTING_RULES[key];
-  if (!rule) return `Unknown setting: ${key}`;
-  if (rule.type === 'bool') {
-    if (value !== 'true' && value !== 'false') return `${key} must be "true" or "false"`;
+  if (!rule) return t('err.settings.unknown', { key });
+  if (rule.type === 'enum') {
+    if (!rule.values.includes(value)) return t('err.settings.enum', { key, values: rule.values.join(', ') });
+  } else if (rule.type === 'bool') {
+    if (value !== 'true' && value !== 'false') return t('err.settings.bool', { key });
   } else if (rule.type === 'int') {
     const n = parseInt(value, 10);
-    if (isNaN(n)) return `${key} must be an integer`;
-    if (n < rule.min || n > rule.max) return `${key} must be between ${rule.min} and ${rule.max}`;
+    if (isNaN(n)) return t('err.settings.not_int', { key });
+    if (n < rule.min || n > rule.max) return t('err.settings.range', { key, min: rule.min, max: rule.max });
   } else if (rule.type === 'string') {
     const s = String(value ?? '');
-    if (s.length < rule.minLen || s.length > rule.maxLen) return `${key} must be ${rule.minLen}–${rule.maxLen} characters`;
+    if (s.length < rule.minLen || s.length > rule.maxLen) return t('err.settings.str_len', { key, min: rule.minLen, max: rule.maxLen });
   } else if (rule.type === 'color') {
-    if (!/^#[0-9a-fA-F]{6}$/.test(String(value))) return `${key} must be a valid hex color (e.g. #7c3aed)`;
+    if (!/^#[0-9a-fA-F]{6}$/.test(String(value))) return t('err.settings.color', { key });
   } else if (rule.type === 'url_or_empty') {
     const s = String(value ?? '').trim();
-    if (s && !/^https?:\/\//i.test(s)) return `${key} must be a http/https URL or empty`;
+    if (s && !/^https?:\/\//i.test(s)) return t('err.settings.url', { key });
   }
   return null; // valid
 }
@@ -266,7 +287,7 @@ app.get('/host/api/settings', requireHost, (_req, res) => {
 
 app.put('/host/api/settings', requireHost, (req, res) => {
   const updates = req.body;
-  if (!updates || typeof updates !== 'object') return res.status(400).json({ error: 'Body must be a JSON object' });
+  if (!updates || typeof updates !== 'object') return res.status(400).json({ error: t('err.settings.not_object') });
   const errors = {};
   const clean = {};
   for (const [key, value] of Object.entries(updates)) {
@@ -287,6 +308,14 @@ app.get('/api/settings/public', (_req, res) => {
     logo_url:                 all.logo_url,
     accent_color:             all.accent_color,
     require_nickname_confirm: all.require_nickname_confirm,
+    ui_language:              all.ui_language,
+    // Audio settings for the display screen
+    sound_enabled:            all.sound_enabled,
+    sfx_volume:               all.sfx_volume,
+    music_volume:             all.music_volume,
+    sfx_pack:                 all.sfx_pack,
+    bgm_lobby:                all.bgm_lobby,
+    bgm_question:             all.bgm_question,
   });
 });
 
@@ -298,12 +327,12 @@ app.get('/host/', requireHost, (_req, res) => {
 
 app.post('/host/api/session/start', requireHost, async (req, res) => {
   const { quizId } = req.body;
-  if (!quizId) return res.status(400).json({ error: 'quizId is required' });
+  if (!quizId) return res.status(400).json({ error: t('err.session.quiz_id_required') });
 
   const quiz = db.getQuizById(Number(quizId));
-  if (!quiz) return res.status(404).json({ error: 'Quiz not found' });
+  if (!quiz) return res.status(404).json({ error: t('err.session.quiz_not_found') });
   if (!quiz.questions.length) {
-    return res.status(400).json({ error: 'Quiz must have at least one question' });
+    return res.status(400).json({ error: t('err.session.no_questions') });
   }
 
   try {
@@ -329,7 +358,7 @@ app.post('/host/api/session/start', requireHost, async (req, res) => {
 
 app.post('/host/api/session/next', requireHost, (req, res) => {
   if (!gameManager.hasActiveSession()) {
-    return res.status(400).json({ error: 'No active session' });
+    return res.status(400).json({ error: t('err.session.no_active') });
   }
   const state = gameManager.getState();
 
@@ -362,7 +391,7 @@ app.post('/host/api/session/next', requireHost, (req, res) => {
       break;
     }
     default:
-      return res.status(400).json({ error: `Cannot advance from status: ${state.status}` });
+      return res.status(400).json({ error: t('err.session.bad_advance', { status: state.status }) });
   }
 
   return res.json({ status: gameManager.hasActiveSession() ? gameManager.getState().status : 'ended' });
@@ -370,11 +399,11 @@ app.post('/host/api/session/next', requireHost, (req, res) => {
 
 app.post('/host/api/session/reveal', requireHost, (req, res) => {
   if (!gameManager.hasActiveSession()) {
-    return res.status(400).json({ error: 'No active session' });
+    return res.status(400).json({ error: t('err.session.no_active') });
   }
   const state = gameManager.getState();
   if (state.status !== 'question') {
-    return res.status(400).json({ error: 'Not in question phase' });
+    return res.status(400).json({ error: t('err.session.not_question') });
   }
   clearAutoTimers();
   revealWithDelay(io, state.pin, gameManager);
@@ -383,7 +412,7 @@ app.post('/host/api/session/reveal', requireHost, (req, res) => {
 
 app.post('/host/api/session/end', requireHost, (req, res) => {
   if (!gameManager.hasActiveSession()) {
-    return res.status(400).json({ error: 'No active session' });
+    return res.status(400).json({ error: t('err.session.no_active') });
   }
   const state = gameManager.getState();
   const pin = state.pin;
@@ -401,7 +430,7 @@ app.post('/host/api/session/end', requireHost, (req, res) => {
 app.get('/api/session/:pin', (req, res) => {
   const row = db.getSessionByPin(req.params.pin);
   if (!row || row.status === 'ended') {
-    return res.status(404).json({ valid: false, error: 'Session not found or has ended' });
+    return res.status(404).json({ valid: false, error: t('err.session.not_found') });
   }
   return res.json({ valid: true, status: row.status });
 });
@@ -415,7 +444,7 @@ app.get('/host/api/quizzes', requireHost, (_req, res) => {
 app.post('/host/api/quizzes', requireHost, (req, res) => {
   const name = (req.body.name ?? '').trim();
   if (!name || name.length > 100) {
-    return res.status(400).json({ error: 'name is required (1–100 characters)' });
+    return res.status(400).json({ error: t('err.quiz.name_required') });
   }
   const quiz = db.createQuiz(name);
   return res.status(201).json(quiz);
@@ -423,7 +452,7 @@ app.post('/host/api/quizzes', requireHost, (req, res) => {
 
 app.get('/host/api/quizzes/:id', requireHost, (req, res) => {
   const quiz = db.getQuizById(Number(req.params.id));
-  if (!quiz) return res.status(404).json({ error: 'Quiz not found' });
+  if (!quiz) return res.status(404).json({ error: t('err.quiz.not_found') });
   return res.json(quiz);
 });
 
@@ -431,10 +460,10 @@ app.put('/host/api/quizzes/:id', requireHost, (req, res) => {
   const id   = Number(req.params.id);
   const name = (req.body.name ?? '').trim();
   if (!name || name.length > 100) {
-    return res.status(400).json({ error: 'name is required (1–100 characters)' });
+    return res.status(400).json({ error: t('err.quiz.name_required') });
   }
   const quiz = db.getQuizById(id);
-  if (!quiz) return res.status(404).json({ error: 'Quiz not found' });
+  if (!quiz) return res.status(404).json({ error: t('err.quiz.not_found') });
   db.updateQuizName(id, name);
   return res.json({ id, name });
 });
@@ -442,7 +471,7 @@ app.put('/host/api/quizzes/:id', requireHost, (req, res) => {
 app.delete('/host/api/quizzes/:id', requireHost, (req, res) => {
   const id = Number(req.params.id);
   const quiz = db.getQuizById(id);
-  if (!quiz) return res.status(404).json({ error: 'Quiz not found' });
+  if (!quiz) return res.status(404).json({ error: t('err.quiz.not_found') });
   db.deleteQuiz(id);
   return res.status(204).send();
 });
@@ -450,7 +479,7 @@ app.delete('/host/api/quizzes/:id', requireHost, (req, res) => {
 app.post('/host/api/quizzes/:id/duplicate', requireHost, (req, res) => {
   const id = Number(req.params.id);
   const quiz = db.getQuizById(id);
-  if (!quiz) return res.status(404).json({ error: 'Quiz not found' });
+  if (!quiz) return res.status(404).json({ error: t('err.quiz.not_found') });
   const newQuiz = db.createQuiz(`Copy of ${quiz.name}`);
   for (const q of quiz.questions) {
     db.addQuestion(newQuiz.id, q.text, q.options, q.correct_index, q.time_limit_seconds,
@@ -470,13 +499,13 @@ app.get('/host/api/sessions/:id', requireHost, (req, res) => {
 app.post('/host/api/quizzes/:id/questions', requireHost, (req, res) => {
   const quizId = Number(req.params.id);
   const quiz   = db.getQuizById(quizId);
-  if (!quiz) return res.status(404).json({ error: 'Quiz not found' });
+  if (!quiz) return res.status(404).json({ error: t('err.quiz.not_found') });
 
   const { text, options, correctIndex, timeLimitSeconds, type, imageUrl, explanation } = req.body;
   const questionType = type === 'truefalse' ? 'truefalse' : 'mcq';
 
   if (!text || !text.trim()) {
-    return res.status(400).json({ error: 'text is required' });
+    return res.status(400).json({ error: t('err.q.text_required') });
   }
 
   const tls = Number(timeLimitSeconds);
@@ -486,7 +515,7 @@ app.post('/host/api/quizzes/:id/questions', requireHost, (req, res) => {
   if (questionType === 'truefalse') {
     parsedOptions = ['True', 'False'];
     if (!Number.isInteger(ci) || ci < 0 || ci > 1) {
-      return res.status(400).json({ error: 'correctIndex must be 0 or 1 for true/false' });
+      return res.status(400).json({ error: t('err.q.tf_correct_index') });
     }
   } else {
     parsedOptions = options;
@@ -495,15 +524,15 @@ app.post('/host/api/quizzes/:id/questions', requireHost, (req, res) => {
     }
     if (!Array.isArray(parsedOptions) || parsedOptions.length !== 4
         || parsedOptions.some(o => typeof o !== 'string' || !o.trim())) {
-      return res.status(400).json({ error: 'options must be an array of exactly 4 non-empty strings' });
+      return res.status(400).json({ error: t('err.q.mcq_options') });
     }
     if (!Number.isInteger(ci) || ci < 0 || ci > 3) {
-      return res.status(400).json({ error: 'correctIndex must be 0–3' });
+      return res.status(400).json({ error: t('err.q.mcq_correct_range') });
     }
   }
 
   if (!Number.isInteger(tls) || tls < 5 || tls > 120) {
-    return res.status(400).json({ error: 'timeLimitSeconds must be 5–120' });
+    return res.status(400).json({ error: t('err.q.time_range') });
   }
 
   const imgUrlRaw = typeof imageUrl === 'string' && imageUrl.trim() ? imageUrl.trim() : null;
@@ -528,19 +557,19 @@ app.put('/host/api/questions/:id', requireHost, (req, res) => {
 
   // Pre-fetch existing question so we can do type-aware validation
   const existing = db.getQuestionById(id);
-  if (!existing) return res.status(404).json({ error: 'Question not found' });
+  if (!existing) return res.status(404).json({ error: t('err.q.not_found') });
 
   const fields = {};
 
   if (req.body.text !== undefined) {
     const text = req.body.text.trim();
-    if (!text) return res.status(400).json({ error: 'text must not be empty' });
+    if (!text) return res.status(400).json({ error: t('err.q.text_empty') });
     fields.text = text;
   }
 
   if (req.body.type !== undefined) {
     const t = req.body.type;
-    if (t !== 'mcq' && t !== 'truefalse') return res.status(400).json({ error: 'type must be mcq or truefalse' });
+    if (t !== 'mcq' && t !== 'truefalse') return res.status(400).json({ error: _t('err.q.bad_type') });
     fields.type = t;
   }
 
@@ -550,7 +579,7 @@ app.put('/host/api/questions/:id', requireHost, (req, res) => {
       try { opts = JSON.parse(opts); } catch { opts = null; }
     }
     if (!Array.isArray(opts) || (opts.length !== 2 && opts.length !== 4) || opts.some(o => typeof o !== 'string' || !o.trim())) {
-      return res.status(400).json({ error: 'options must be an array of 2 or 4 non-empty strings' });
+      return res.status(400).json({ error: t('err.q.options_invalid') });
     }
     fields.options = opts.map(o => o.trim());
   }
@@ -563,8 +592,8 @@ app.put('/host/api/questions/:id', requireHost, (req, res) => {
     if (!Number.isInteger(ci) || ci < 0 || ci > maxCI) {
       return res.status(400).json({
         error: effectiveType === 'truefalse'
-          ? 'correctIndex must be 0 or 1 for true/false'
-          : 'correctIndex must be 0–3',
+          ? t('err.q.tf_correct_index')
+          : t('err.q.mcq_correct_range'),
       });
     }
     fields.correct_index = ci;
@@ -573,7 +602,7 @@ app.put('/host/api/questions/:id', requireHost, (req, res) => {
   if (req.body.time_limit_seconds !== undefined) {
     const tls = Number(req.body.time_limit_seconds);
     if (!Number.isInteger(tls) || tls < 5 || tls > 120) {
-      return res.status(400).json({ error: 'timeLimitSeconds must be 5–120' });
+      return res.status(400).json({ error: t('err.q.time_range') });
     }
     fields.time_limit_seconds = tls;
   }
@@ -608,7 +637,7 @@ app.delete('/host/api/questions/:id', requireHost, (req, res) => {
   const id = Number(req.params.id);
   // Check if exists (deleteQuestion returns RunResult, not the row)
   const result = db.deleteQuestion(id);
-  if (result.changes === 0) return res.status(404).json({ error: 'Question not found' });
+  if (result.changes === 0) return res.status(404).json({ error: t('err.q.not_found') });
   return res.status(204).send();
 });
 

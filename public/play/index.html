@@ -2,35 +2,66 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <title>Join Quiz</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;900&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="/shared.css">
+  <script src="/i18n.js"></script>
+  <script src="/lang.js"></script>
   <script src="/socket.io/socket.io.js"></script>
   <style>
     html, body { height: 100%; overflow: hidden; }
     .screen { display: none; }
     .screen.active { display: flex; }
+
+    /* ── Question tile grid ─────────────────────────────────────────────── */
     .tile-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
       grid-template-rows: 1fr 1fr;
-      gap: 12px;
+      gap: 10px;
       flex: 1;
       min-height: 0;
     }
-    .answer-tile { min-height: 0; font-size: 1.1rem; }
-    /* Larger shapes on phone */
-    .answer-tile .shape-icon { font-size: 3.5rem; }
-    /* Timer bar */
+
+    .answer-tile {
+      min-height: 0;
+      transition: opacity 0.22s ease, transform 0.22s ease;
+    }
+
+    /* Shape icons — SVG-based so all four are pixel-identical in visual mass.
+       font-size rule removed; SVG width/height controls size instead. */
+    .answer-tile .shape-icon {
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /*
+     * After the player selects an answer, the grid enters 'answered' mode.
+     * The 3 unchosen tiles fade out and scale down; the chosen tile gets a
+     * bright inset ring so the selection is unmistakeable.
+     */
+    .tile-grid.answered .answer-tile:not(.selected) {
+      opacity: 0.18;
+      transform: scale(0.93);
+      pointer-events: none;
+    }
+    .tile-grid.answered .answer-tile.selected {
+      opacity: 1;
+      pointer-events: none;
+      box-shadow: inset 0 0 0 5px rgba(255,255,255,0.88);
+    }
+
+    /* ── Timer / score bar — normal flow, no overlap ────────────────────── */
     #timer-bar-wrap {
-      position: absolute;
-      bottom: 0; left: 0; right: 0;
+      width: 100%;
       height: 8px;
-      background: rgba(255,255,255,0.2);
-      border-radius: 0 0 12px 12px;
+      background: rgba(255,255,255,0.22);
+      border-radius: 4px;
       overflow: hidden;
     }
     #timer-bar {
@@ -38,19 +69,19 @@
       background: #fff;
       width: 100%;
       transform-origin: right;
-      border-radius: 0 0 12px 12px;
+      border-radius: 4px;
     }
     #timer-points {
-      position: absolute;
-      bottom: 16px; left: 0; right: 0;
       text-align: center;
-      font-size: 1.4rem;
+      font-size: 1.3rem;
       font-weight: 900;
       color: white;
-      text-shadow: 0 1px 4px rgba(0,0,0,0.5);
-      pointer-events: none;
+      text-shadow: 0 1px 4px rgba(0,0,0,0.4);
+      min-height: 1.8rem;
+      line-height: 1.8rem;
     }
-    #screen-question { position: relative; }
+
+    /* ── Lobby ──────────────────────────────────────────────────────────── */
     #screen-lobby .chip-grid {
       display: flex;
       flex-wrap: wrap;
@@ -67,14 +98,16 @@
 <div id="screen-pin" class="screen active flex-col items-center justify-center h-full p-6 gap-5">
   <div class="text-center">
     <div class="text-5xl mb-2">🎮</div>
-    <h1 class="text-3xl font-black">Join a Game</h1>
+    <h1 class="text-3xl font-black" data-i18n="play.join_game">Join a Game</h1>
   </div>
   <div class="w-full max-w-xs space-y-3">
     <input id="pin-input" type="tel" inputmode="numeric" maxlength="6" placeholder="Game PIN"
+      data-i18n-placeholder="play.placeholder_pin"
       class="w-full text-center text-3xl font-black text-gray-800 rounded-2xl px-4 py-4 focus:outline-none focus:ring-4 focus:ring-purple-300 tracking-widest">
     <p id="pin-error" class="hidden text-red-300 text-sm font-bold text-center"></p>
     <button id="btn-pin-join"
-      class="w-full bg-white text-purple-800 font-black text-xl rounded-2xl py-4 hover:bg-purple-50 transition-colors shadow-lg">
+      class="w-full bg-white text-purple-800 font-black text-xl rounded-2xl py-4 hover:bg-purple-50 transition-colors shadow-lg"
+      data-i18n="play.btn_join">
       Join →
     </button>
   </div>
@@ -83,16 +116,18 @@
 <!-- ── Screen 2: Nickname ─────────────────────────────────────────────────── -->
 <div id="screen-nickname" class="screen flex-col items-center justify-center h-full p-6 gap-5">
   <div class="text-center">
-    <h1 class="text-3xl font-black">Pick a Nickname</h1>
-    <p class="text-white/60 mt-1 font-bold">Up to 20 characters</p>
+    <h1 class="text-3xl font-black" data-i18n="play.pick_nickname">Pick a Nickname</h1>
+    <p class="text-white/60 mt-1 font-bold" data-i18n="play.nickname_maxchars">Up to 20 characters</p>
   </div>
   <div class="w-full max-w-xs space-y-3">
     <input id="nickname-input" type="text" maxlength="20" placeholder="Your nickname"
       autocomplete="off" autocorrect="off" autocapitalize="words" spellcheck="false"
+      data-i18n-placeholder="play.placeholder_nickname"
       class="w-full text-center text-2xl font-black text-gray-800 rounded-2xl px-4 py-4 focus:outline-none focus:ring-4 focus:ring-purple-300">
     <p id="nickname-error" class="hidden text-red-300 text-sm font-bold text-center"></p>
     <button id="btn-nickname-join"
-      class="w-full bg-white text-purple-800 font-black text-xl rounded-2xl py-4 hover:bg-purple-50 transition-colors shadow-lg">
+      class="w-full bg-white text-purple-800 font-black text-xl rounded-2xl py-4 hover:bg-purple-50 transition-colors shadow-lg"
+      data-i18n="play.btn_enter_game">
       Enter Game
     </button>
   </div>
@@ -101,40 +136,81 @@
 <!-- ── Screen 3: Lobby ────────────────────────────────────────────────────── -->
 <div id="screen-lobby" class="screen flex-col items-center justify-center h-full p-6 gap-4">
   <div class="text-center">
-    <h1 class="text-3xl font-black">Get ready! 🎮</h1>
-    <p id="lobby-count-line" class="text-xl font-bold mt-2"><span id="lobby-count">0</span> player(s) joined</p>
+    <h1 class="text-3xl font-black" data-i18n="play.get_ready">Get ready! 🎮</h1>
+    <p id="lobby-count-line" class="text-xl font-bold mt-2"><span id="lobby-count">0</span> <span data-i18n="play.players_joined" data-i18n-vars='{"n":""}'>player(s) joined</span></p>
   </div>
   <div class="chip-grid w-full max-w-sm px-4"></div>
-  <p class="pulse text-white/60 font-bold text-sm mt-4">Waiting for host to start…</p>
+  <p class="pulse text-white/60 font-bold text-sm mt-4" data-i18n="play.waiting_host">Waiting for host to start…</p>
+</div>
+
+<!-- ── Screen 3b: Nickname confirmation (optional, controlled by setting) ──── -->
+<div id="screen-confirm" class="screen flex-col items-center justify-center h-full p-6 gap-5">
+  <div class="text-center">
+    <h1 class="text-3xl font-black" data-i18n="play.confirm_nickname">Confirm Nickname</h1>
+    <p class="text-white/70 font-bold text-xl mt-3"><span data-i18n="play.play_as">Play as</span> <span id="confirm-nickname" class="text-white font-black"></span>?</p>
+  </div>
+  <div class="w-full max-w-xs flex gap-3">
+    <button id="btn-confirm-no"
+      class="flex-1 bg-white/20 text-white font-black text-xl rounded-2xl py-4 hover:bg-white/30 transition-colors"
+      data-i18n="play.btn_back">
+      Back
+    </button>
+    <button id="btn-confirm-yes"
+      class="flex-1 bg-white text-purple-800 font-black text-xl rounded-2xl py-4 hover:bg-purple-50 transition-colors shadow-lg"
+      data-i18n="play.btn_yes_join">
+      Yes, join!
+    </button>
+  </div>
 </div>
 
 <!-- ── Screen 4: Question ─────────────────────────────────────────────────── -->
-<div id="screen-question" class="screen flex-col h-full p-4 gap-4">
-  <div class="text-center">
-    <span id="q-progress" class="bg-white/20 px-3 py-1 rounded-full text-sm font-bold"></span>
+<div id="screen-question" class="screen flex-col h-full">
+
+  <!-- Progress pill — top-inset respects device notch / Dynamic Island.
+       Extra 0.4rem gives breathing room so the pill doesn't press against the island. -->
+  <div class="shrink-0 flex items-center justify-center px-4"
+       style="padding-top: max(calc(env(safe-area-inset-top, 0px) + 0.4rem), 1rem); padding-bottom: 0.5rem">
+    <span id="q-progress" class="bg-white/25 px-4 py-1.5 rounded-full text-sm font-black tracking-wide"></span>
   </div>
-  <div id="q-text" class="text-center font-black text-xl leading-snug px-2 flex-shrink-0"></div>
-  <div class="tile-grid">
+
+  <!-- Question text -->
+  <div id="q-text" class="shrink-0 text-center font-black text-xl leading-snug px-4 pb-3"></div>
+
+  <!-- 2×2 answer grid — flex:1 fills all remaining vertical space -->
+  <div class="tile-grid px-3">
     <button class="answer-tile tile-red" data-index="0">
-      <span class="shape-icon">▲</span>
+      <span class="shape-icon">
+        <svg viewBox="0 0 100 100" width="48" height="48" fill="white" aria-hidden="true"><polygon points="50,6 94,90 6,90"/></svg>
+      </span>
       <span class="opt-label" data-index="0"></span>
     </button>
     <button class="answer-tile tile-blue" data-index="1">
-      <span class="shape-icon">◆</span>
+      <span class="shape-icon">
+        <svg viewBox="0 0 100 100" width="48" height="48" fill="white" aria-hidden="true"><polygon points="50,4 96,50 50,96 4,50"/></svg>
+      </span>
       <span class="opt-label" data-index="1"></span>
     </button>
     <button class="answer-tile tile-yellow" data-index="2">
-      <span class="shape-icon">●</span>
+      <span class="shape-icon">
+        <svg viewBox="0 0 100 100" width="48" height="48" fill="white" aria-hidden="true"><circle cx="50" cy="50" r="46"/></svg>
+      </span>
       <span class="opt-label" data-index="2"></span>
     </button>
     <button class="answer-tile tile-green" data-index="3">
-      <span class="shape-icon">■</span>
+      <span class="shape-icon">
+        <svg viewBox="0 0 100 100" width="48" height="48" fill="white" aria-hidden="true"><rect x="6" y="6" width="88" height="88"/></svg>
+      </span>
       <span class="opt-label" data-index="3"></span>
     </button>
   </div>
-  <!-- Depleting timer bar pinned to bottom of question screen -->
-  <div id="timer-bar-wrap"><div id="timer-bar"></div></div>
-  <div id="timer-points"></div>
+
+  <!-- Bottom bar: score points above the depleting timer strip.
+       Both in normal flow — no absolute positioning, no overlap. -->
+  <div class="shrink-0 flex flex-col gap-2 px-4 pt-3"
+       style="padding-bottom: max(0.75rem, env(safe-area-inset-bottom, 0px))">
+    <div id="timer-points"></div>
+    <div id="timer-bar-wrap"><div id="timer-bar"></div></div>
+  </div>
 </div>
 
 <!-- ── Screen 5: Feedback ─────────────────────────────────────────────────── -->
@@ -145,7 +221,7 @@
   <div id="feedback-score" class="text-5xl font-black count-bounce">0</div>
   <div id="feedback-rank" class="text-white/70 font-bold text-lg"></div>
   <div id="feedback-explanation" class="hidden bg-white/10 rounded-2xl px-5 py-3 text-sm font-bold text-white/80 max-w-xs text-center"></div>
-  <div id="feedback-waiting" class="hidden pulse text-white/50 font-bold text-sm mt-2">
+  <div id="feedback-waiting" class="hidden pulse text-white/50 font-bold text-sm mt-2" data-i18n="play.waiting_next">
     Waiting for next question…
   </div>
 </div>
@@ -153,8 +229,8 @@
 <!-- ── Screen 6: Game ended ───────────────────────────────────────────────── -->
 <div id="screen-ended" class="screen flex-col items-center justify-center h-full p-6 gap-5 text-center">
   <div class="text-6xl">🎉</div>
-  <h1 class="text-3xl font-black">Thanks for playing!</h1>
-  <p class="text-white/70 font-bold text-xl">Final score: <span id="ended-score" class="text-white font-black">0</span></p>
+  <h1 class="text-3xl font-black" data-i18n="play.thanks_playing">Thanks for playing!</h1>
+  <p class="text-white/70 font-bold text-xl"><span data-i18n="play.final_score">Final score:</span> <span id="ended-score" class="text-white font-black">0</span></p>
   <p id="ended-rank" class="text-white/60 font-bold"></p>
 </div>
 
@@ -179,6 +255,9 @@ let brandingSettings = {};
     if (s.accent_color && /^#[0-9a-fA-F]{6}$/.test(s.accent_color)) {
       document.documentElement.style.setProperty('--accent', s.accent_color);
     }
+    // Apply i18n
+    window.applyI18n(s.ui_language || 'en');
+    if (s.platform_name) document.title = s.platform_name;
     if (s.logo_url) {
       const logoWrap = document.getElementById('pin-logo-wrap');
       const logoImg  = document.getElementById('pin-logo');
@@ -194,6 +273,8 @@ let savedPin = '';
 let savedNickname = '';
 let savedPlayerId = null;
 let currentScore = 0;
+let submittedOptionIndex = null; // tracks the index the player tapped this round
+let socketReady = false;          // true once join-success received; false on disconnect
 let playerBarRaf = null;
 let playerBarStart = null;
 let playerBarTotal = 0;
@@ -250,14 +331,14 @@ async function validatePin() {
   try {
     const res = await fetch(`/api/session/${pin}`);
     if (!res.ok) {
-      showPinError('Game not found — check the PIN');
+      showPinError(t('play.err_game_not_found'));
       return;
     }
     savedPin = pin;
     showScreen('screen-nickname');
     document.getElementById('nickname-input').focus();
   } catch {
-    showPinError('Cannot connect — try again');
+    showPinError(t('play.err_cannot_connect'));
   }
 }
 
@@ -275,7 +356,7 @@ document.getElementById('nickname-input').addEventListener('keypress', e => { if
 function joinGame() {
   const nickname = document.getElementById('nickname-input').value.trim();
   if (!nickname) {
-    showNicknameError('Nickname is required');
+    showNicknameError(t('play.err_nickname_required'));
     return;
   }
   // If require_nickname_confirm is enabled, show confirmation screen first
@@ -317,6 +398,16 @@ function showNicknameError(msg) {
 // ── Socket events ─────────────────────────────────────────────────────────────
 
 function bindSocketEvents() {
+  // On every socket.io reconnect the server assigns a NEW socketId.
+  // Re-emitting join-lobby triggers the server's nickname-match (reconnect)
+  // path which updates the player's socketId — so submitAnswer lookups work.
+  // On the very first connect savedNickname is '' so this is a safe no-op.
+  socket.on('connect', () => {
+    if (savedPin && savedNickname) {
+      socket.emit('join-lobby', { pin: savedPin, nickname: savedNickname });
+    }
+  });
+
   socket.on('join-error', ({ message }) => {
     // Return to nickname screen from confirmation screen if join was rejected
     if (document.getElementById('screen-confirm').classList.contains('active')) {
@@ -332,14 +423,22 @@ function bindSocketEvents() {
   socket.on('join-success', ({ playerId, nickname, playerCount }) => {
     savedPlayerId = playerId;
     savedNickname = nickname;
-    const countLine = document.getElementById('lobby-count-line');
-    if (playerCount !== null && playerCount !== undefined) {
-      document.getElementById('lobby-count').textContent = playerCount;
-      if (countLine) countLine.style.display = '';
-    } else {
-      if (countLine) countLine.style.display = 'none';
+    socketReady = true;
+    // Only navigate to the lobby from entry/pre-game screens.
+    // Mid-game reconnects silently update the socketId on the server;
+    // navigating away here would disrupt an in-progress question/feedback.
+    const activeId = document.querySelector('.screen.active')?.id;
+    const entryScreens = new Set(['screen-pin', 'screen-nickname', 'screen-confirm', 'screen-lobby']);
+    if (!activeId || entryScreens.has(activeId)) {
+      const countLine = document.getElementById('lobby-count-line');
+      if (playerCount !== null && playerCount !== undefined) {
+        document.getElementById('lobby-count').textContent = playerCount;
+        if (countLine) countLine.style.display = '';
+      } else {
+        if (countLine) countLine.style.display = 'none';
+      }
+      showScreen('screen-lobby');
     }
-    showScreen('screen-lobby');
   });
 
   socket.on('lobby-update', ({ players, playerCount }) => {
@@ -358,7 +457,7 @@ function bindSocketEvents() {
     document.querySelectorAll('.confetti-piece').forEach(el => el.remove());
 
     document.getElementById('q-progress').textContent =
-      `Q ${data.questionIndex + 1} / ${data.totalQuestions}`;
+      t('play.q_n_of_m', { n: data.questionIndex + 1, m: data.totalQuestions });
 
     // Question text + optional image
     const imgHtml = data.imageUrl
@@ -370,15 +469,24 @@ function bindSocketEvents() {
     const isTF = data.type === 'truefalse';
     const grid = document.querySelector('.tile-grid');
     grid.style.gridTemplateRows = isTF ? '1fr' : '1fr 1fr';
-    data.options.forEach((opt, i) => {
+    // Always iterate all 4 tiles so hidden ones are explicitly shown/hidden
+    // regardless of how many options the data array contains.
+    for (let i = 0; i < 4; i++) {
       const tile = document.querySelector(`.answer-tile[data-index="${i}"]`);
-      tile.style.display = (isTF && i >= 2) ? 'none' : '';
-      document.querySelector(`.opt-label[data-index="${i}"]`).textContent = opt;
-    });
+      const shouldHide = isTF && i >= 2;
+      tile.style.display = shouldHide ? 'none' : '';
+      document.querySelector(`.opt-label[data-index="${i}"]`).textContent = data.options[i] ?? '';
+    }
 
-    // Reset tiles
+    // Reset tiles and 'answered' mode — also clear any inline styles from lockTiles()
+    submittedOptionIndex = null;
+    document.querySelector('.tile-grid').classList.remove('answered');
     document.querySelectorAll('.answer-tile').forEach(tile => {
       tile.classList.remove('disabled', 'selected');
+      tile.style.opacity = '';
+      tile.style.transform = '';
+      tile.style.boxShadow = '';
+      tile.style.pointerEvents = '';
     });
 
     showScreen('screen-question');
@@ -396,8 +504,14 @@ function bindSocketEvents() {
 
   socket.on('question-reveal', (data) => {
     cancelTimerBar();
-    const myResult = data.playerResults && data.playerResults[savedNickname];
-    const isCorrect = myResult ? myResult.correct : false;
+    const myResult = data.playerResults?.[savedNickname];
+    // If the server recorded an answer (chosenIndex !== null), trust its result.
+    // Otherwise fall back to a client-side check — covers reconnect races where
+    // the server never received the answer under the new socketId.
+    const serverRecorded = myResult != null && myResult.chosenIndex !== null;
+    const isCorrect = serverRecorded
+      ? myResult.correct
+      : (submittedOptionIndex !== null && submittedOptionIndex === data.correctIndex);
     const newScore = myResult ? myResult.newScore : currentScore;
     const oldScore = currentScore;
     currentScore = newScore;
@@ -410,12 +524,13 @@ function bindSocketEvents() {
     document.getElementById('feedback-icon').classList.add('spring-in');
 
     document.getElementById('feedback-result').textContent = isCorrect
-      ? `+${myResult.pointsEarned} points!` : 'Not this time…';
+      ? t('play.feedback_correct', { pts: myResult?.pointsEarned ?? 0 })
+      : t('play.feedback_wrong');
 
     // Streak bonus
     const streakEl = document.getElementById('feedback-streak');
     if (myResult && myResult.bonusPoints > 0) {
-      streakEl.textContent = `🔥 Streak bonus! +${myResult.bonusPoints}`;
+      streakEl.textContent = t('play.streak_bonus', { pts: myResult.bonusPoints });
       streakEl.classList.remove('hidden');
     } else {
       streakEl.classList.add('hidden');
@@ -448,7 +563,7 @@ function bindSocketEvents() {
     const myEntry = data.leaderboard.find(p => p.nickname === savedNickname);
     if (myEntry) {
       document.getElementById('feedback-rank').textContent =
-        `Rank ${myEntry.rank} of ${data.leaderboard.length}`;
+        t('play.rank_n_of_m', { rank: myEntry.rank, total: data.leaderboard.length });
     }
   });
 
@@ -457,12 +572,13 @@ function bindSocketEvents() {
     document.getElementById('ended-score').textContent = currentScore;
     if (myEntry) {
       document.getElementById('ended-rank').textContent =
-        `Final Rank: ${myEntry.rank} of ${data.allPlayers.length}`;
+        t('play.final_rank', { rank: myEntry.rank, total: data.allPlayers.length });
     }
     showScreen('screen-ended');
   });
 
   socket.on('disconnect', () => {
+    socketReady = false;
     // Reconnect handled automatically by socket.io
   });
 }
@@ -471,15 +587,35 @@ function bindSocketEvents() {
 
 document.querySelectorAll('.answer-tile').forEach(tile => {
   tile.addEventListener('click', () => {
+    if (tile.classList.contains('disabled')) return;
     const idx = Number(tile.dataset.index);
+    submittedOptionIndex = idx;
+    tile.classList.add('selected'); // mark BEFORE lockTiles so CSS sees it immediately
     lockTiles();
-    tile.classList.add('selected');
     socket.emit('submit-answer', { optionIndex: idx });
   });
 });
 
 function lockTiles() {
-  document.querySelectorAll('.answer-tile').forEach(t => t.classList.add('disabled'));
+  // Drive visual state via inline styles so the effect is immune to
+  // CSS cascade ordering (Tailwind CDN injects styles dynamically on mobile).
+  document.querySelectorAll('.answer-tile').forEach(t => {
+    t.classList.add('disabled');
+    t.style.pointerEvents = 'none'; // belt-and-suspenders: inline override
+    if (t.style.display === 'none') return; // skip hidden T/F tiles
+    if (t.classList.contains('selected')) {
+      t.style.opacity = '1';
+      t.style.transform = 'scale(1)';
+      t.style.boxShadow = 'inset 0 0 0 5px rgba(255,255,255,0.88)';
+    } else {
+      t.style.opacity = '0.18';
+      t.style.transform = 'scale(0.93)';
+      t.style.boxShadow = '';
+    }
+  });
+  if (document.querySelector('.answer-tile.selected')) {
+    document.querySelector('.tile-grid').classList.add('answered');
+  }
 }
 
 // ── Lobby chips ───────────────────────────────────────────────────────────────

@@ -9,6 +9,12 @@
 /* ── Base ─────────────────────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* Match html background to the dark edge of the gradient so iOS Safari's
+   status-bar chrome area (exposed by viewport-fit=cover) is purple, not white. */
+html {
+  background: #46178F;
+}
+
 body {
   font-family: 'Nunito', sans-serif;
   -webkit-font-smoothing: antialiased;

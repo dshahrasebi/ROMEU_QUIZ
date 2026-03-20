@@ -351,6 +351,227 @@ function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
     }
   }
 
+  // ══════════════════════════════════════════════════════════════════════════
+  //  Edge-case tests: duplicate submit, reconnect, answer-locked, unanswered
+  // ══════════════════════════════════════════════════════════════════════════
+  console.log('\n═══════════════════════════════════════════════════════════════');
+  console.log('  Edge-Case Tests');
+  console.log('═══════════════════════════════════════════════════════════════');
+
+  let ecQuizId, ecPin;
+  let ecHost, ecP1, ecP2;
+  try {
+    // Re-login (previous session cookie still valid but let's be safe)
+    const loginRes = await req(
+      { path: '/host/login', method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' } },
+      `password=${encodeURIComponent(PASSWORD)}`
+    );
+    const setCookies2 = loginRes.headers['set-cookie'] ?? [];
+    const cookie2 = setCookies2.map(c => c.split(';')[0]).join('; ');
+    const csrfToken2 = (setCookies2.find(c => c.startsWith('csrf-token=')) ?? '').match(/^csrf-token=([^;]+)/)?.[1] ?? '';
+    const authH2 = { 'Content-Type': 'application/json', Cookie: cookie2, 'X-CSRF-Token': csrfToken2 };
+
+    // Create quiz with 2 MCQ questions
+    const ecQR = await req({ path: '/host/api/quizzes', method: 'POST', headers: authH2 }, { name: 'Edge Case Quiz' });
+    ecQuizId = json(ecQR.body)?.id;
+
+    // Q1: correct = index 2
+    await req({ path: `/host/api/quizzes/${ecQuizId}/questions`, method: 'POST', headers: authH2 },
+      { text: 'EC Q1', options: ['A','B','C','D'], correctIndex: 2, timeLimitSeconds: 30 });
+    // Q2: correct = index 1
+    await req({ path: `/host/api/quizzes/${ecQuizId}/questions`, method: 'POST', headers: authH2 },
+      { text: 'EC Q2', options: ['X','Y','Z','W'], correctIndex: 1, timeLimitSeconds: 30 });
+
+    // Start session
+    const ecSessR = await req({ path: '/host/api/session/start', method: 'POST', headers: authH2 }, { quizId: ecQuizId });
+    ecPin = json(ecSessR.body)?.pin;
+
+    // Connect sockets
+    ecHost = await connect(BASE, { extraHeaders: { cookie: cookie2 } });
+    ecP1   = await connect(BASE);
+    ecP2   = await connect(BASE);
+
+    const ecHostStateP = waitFor(ecHost, 'host-state');
+    ecHost.emit('host-join', { pin: ecPin });
+    await ecHostStateP;
+
+    const ecP1JoinP = waitFor(ecP1, 'join-success');
+    ecP1.emit('join-lobby', { pin: ecPin, nickname: 'Carol' });
+    await ecP1JoinP;
+
+    const ecP2JoinP = waitFor(ecP2, 'join-success');
+    ecP2.emit('join-lobby', { pin: ecPin, nickname: 'Dave' });
+    await ecP2JoinP;
+
+    // ── Test A: Duplicate submission rejected ─────────────────────────────────
+    console.log('\n── Test A: Duplicate Submission ──────────────────────────────────');
+
+    const ecQ1HostP = waitFor(ecHost, 'question-start');
+    const ecQ1P1P   = waitFor(ecP1, 'question-start');
+    const ecQ1P2P   = waitFor(ecP2, 'question-start');
+    await req({ path: '/host/api/session/next', method: 'POST', headers: authH2 });
+    await ecQ1HostP;
+    await ecQ1P1P;
+    await ecQ1P2P;
+
+    // P1 submits correct answer (index 2)
+    const ecP1AccP = waitFor(ecP1, 'answer-accepted');
+    ecP1.emit('submit-answer', { optionIndex: 2 });
+    await ecP1AccP;
+    check('P1 first submit accepted', true);
+
+    // P1 tries to submit again — should NOT get answer-accepted
+    let gotSecondAccept = false;
+    ecP1.once('answer-accepted', () => { gotSecondAccept = true; });
+    ecP1.emit('submit-answer', { optionIndex: 0 });
+    await sleep(300); // give it time to respond
+    check('P1 duplicate submit rejected (no second answer-accepted)', gotSecondAccept === false);
+
+    // P2 submits to trigger auto-reveal
+    const ecP2AccP = waitFor(ecP2, 'answer-accepted');
+    const ecQ1RevP = waitFor(ecHost, 'question-reveal', 8000);
+    ecP2.emit('submit-answer', { optionIndex: 0 });
+    await ecP2AccP;
+
+    const ecQ1Rev = await ecQ1RevP;
+    check('Dup test: P1 still correct despite second emit', ecQ1Rev?.playerResults?.Carol?.correct === true);
+    check('Dup test: P1 chosenIndex=2 (first answer kept)', ecQ1Rev?.playerResults?.Carol?.chosenIndex === 2, `got ${ecQ1Rev?.playerResults?.Carol?.chosenIndex}`);
+
+    // ── Test B: answer-locked after reveal ────────────────────────────────────
+    console.log('\n── Test B: Answer-Locked After Reveal ───────────────────────────');
+
+    const ecLockedP = waitFor(ecP1, 'answer-locked', 3000);
+    ecP1.emit('submit-answer', { optionIndex: 1 });
+    const lockedData = await ecLockedP;
+    check('answer-locked received after reveal phase', !!lockedData);
+
+    // Advance through leaderboard to Q2
+    const ecLb1P = waitFor(ecHost, 'leaderboard-update');
+    await req({ path: '/host/api/session/next', method: 'POST', headers: authH2 });
+    await ecLb1P;
+
+    // ── Test C: chosenIndex null when unanswered ──────────────────────────────
+    console.log('\n── Test C: chosenIndex null when unanswered ─────────────────────');
+
+    const ecQ2HostP = waitFor(ecHost, 'question-start');
+    const ecQ2P1P   = waitFor(ecP1, 'question-start');
+    const ecQ2P2P   = waitFor(ecP2, 'question-start');
+    await req({ path: '/host/api/session/next', method: 'POST', headers: authH2 });
+    await ecQ2HostP;
+    await ecQ2P1P;
+    await ecQ2P2P;
+
+    // Only P2 answers; P1 does NOT answer
+    const ecP2AccQ2P = waitFor(ecP2, 'answer-accepted');
+    ecP2.emit('submit-answer', { optionIndex: 1 });
+    await ecP2AccQ2P;
+
+    // Force reveal via timer expiry — wait for auto-reveal (30s timeout set, but
+    // we can't wait that long). Instead, use host-next to force it.
+    // Actually the auto-reveal triggers when all *connected* players answer.
+    // Only P2 answered, P1 didn't. We need to force the reveal.
+    // Let's advance via host API which triggers reveal from question state.
+    const ecQ2RevP = waitFor(ecHost, 'question-reveal', 8000);
+    await req({ path: '/host/api/session/next', method: 'POST', headers: authH2 });
+    const ecQ2Rev = await ecQ2RevP;
+
+    check('Unanswered: Carol chosenIndex is null', ecQ2Rev?.playerResults?.Carol?.chosenIndex === null, `got ${ecQ2Rev?.playerResults?.Carol?.chosenIndex}`);
+    check('Unanswered: Carol correct is false', ecQ2Rev?.playerResults?.Carol?.correct === false);
+    check('Unanswered: Dave correct is true (answered 1)', ecQ2Rev?.playerResults?.Dave?.correct === true);
+    check('Unanswered: Dave chosenIndex=1', ecQ2Rev?.playerResults?.Dave?.chosenIndex === 1, `got ${ecQ2Rev?.playerResults?.Dave?.chosenIndex}`);
+
+    // ── Test D: Reconnect + submit → correct result ──────────────────────────
+    console.log('\n── Test D: Reconnect + Submit → Correct ─────────────────────────');
+
+    // We need a new session for this since the current one is consumed.
+    // End current session first.
+    const ecLb2P = waitFor(ecHost, 'leaderboard-update');
+    await req({ path: '/host/api/session/next', method: 'POST', headers: authH2 });
+    await ecLb2P;
+    const ecEndP = waitFor(ecHost, 'game-ended', 5000);
+    await req({ path: '/host/api/session/next', method: 'POST', headers: authH2 });
+    await ecEndP;
+
+    // Create a new quiz + session for reconnect test
+    const rcQR = await req({ path: '/host/api/quizzes', method: 'POST', headers: authH2 }, { name: 'Reconnect Quiz' });
+    const rcQuizId = json(rcQR.body)?.id;
+    await req({ path: `/host/api/quizzes/${rcQuizId}/questions`, method: 'POST', headers: authH2 },
+      { text: 'RC Q1', options: ['A','B','C','D'], correctIndex: 0, timeLimitSeconds: 30 });
+
+    const rcSessR = await req({ path: '/host/api/session/start', method: 'POST', headers: authH2 }, { quizId: rcQuizId });
+    const rcPin = json(rcSessR.body)?.pin;
+
+    // Disconnect old sockets, connect fresh ones
+    [ecHost, ecP1, ecP2].forEach(s => s?.disconnect());
+    await sleep(200);
+
+    const rcHost = await connect(BASE, { extraHeaders: { cookie: cookie2 } });
+    const rcP1   = await connect(BASE);
+
+    const rcHostStateP = waitFor(rcHost, 'host-state');
+    rcHost.emit('host-join', { pin: rcPin });
+    await rcHostStateP;
+
+    // P1 joins
+    const rcP1JoinP = waitFor(rcP1, 'join-success');
+    rcP1.emit('join-lobby', { pin: rcPin, nickname: 'Eve' });
+    await rcP1JoinP;
+
+    // Start question
+    const rcQ1HostP = waitFor(rcHost, 'question-start');
+    const rcQ1P1P   = waitFor(rcP1, 'question-start');
+    await req({ path: '/host/api/session/next', method: 'POST', headers: authH2 });
+    await rcQ1HostP;
+    await rcQ1P1P;
+
+    // Disconnect P1 and reconnect with a NEW socket
+    rcP1.disconnect();
+    await sleep(300);
+    const rcP1New = await connect(BASE);
+
+    // Re-join with same nickname (triggers reconnect path on server)
+    const rcP1ReJoinP = waitFor(rcP1New, 'join-success');
+    rcP1New.emit('join-lobby', { pin: rcPin, nickname: 'Eve' });
+    const rcReJoin = await rcP1ReJoinP;
+    check('Reconnect: join-success after rejoin', !!rcReJoin);
+
+    // Submit correct answer (index 0) on the reconnected socket
+    const rcP1AccP  = waitFor(rcP1New, 'answer-accepted');
+    const rcRevealP = waitFor(rcHost, 'question-reveal', 8000);
+    rcP1New.emit('submit-answer', { optionIndex: 0 });
+    const rcAcc = await rcP1AccP;
+    check('Reconnect: answer-accepted after rejoin', !!rcAcc);
+
+    const rcReveal = await rcRevealP;
+    check('Reconnect: Eve correct=true', rcReveal?.playerResults?.Eve?.correct === true);
+    check('Reconnect: Eve chosenIndex=0', rcReveal?.playerResults?.Eve?.chosenIndex === 0, `got ${rcReveal?.playerResults?.Eve?.chosenIndex}`);
+    check('Reconnect: Eve pointsEarned > 0', rcReveal?.playerResults?.Eve?.pointsEarned > 0, `got ${rcReveal?.playerResults?.Eve?.pointsEarned}`);
+
+    // Cleanup reconnect quiz
+    [rcHost, rcP1New].forEach(s => s?.disconnect());
+    try {
+      await req({ path: `/host/api/quizzes/${rcQuizId}`, method: 'DELETE', headers: authH2 });
+    } catch {}
+
+  } catch (err) {
+    console.error('\n  FAIL  Edge-case error:', err.message);
+    failed++;
+  } finally {
+    [ecHost, ecP1, ecP2].forEach(s => { try { s?.disconnect(); } catch {} });
+    if (ecQuizId) {
+      try {
+        const loginRes = await req(
+          { path: '/host/login', method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' } },
+          `password=${encodeURIComponent(PASSWORD)}`
+        );
+        const sc = loginRes.headers['set-cookie'] ?? [];
+        const ck = sc.map(c => c.split(';')[0]).join('; ');
+        await req({ path: `/host/api/quizzes/${ecQuizId}`, method: 'DELETE', headers: { 'Content-Type': 'application/json', Cookie: ck } });
+        console.log('  INFO  Edge-case quiz deleted');
+      } catch {}
+    }
+  }
+
   console.log('\n═══════════════════════════════════════════════════════════════');
   console.log(`  Results: ${passed} passed, ${failed} failed`);
   console.log('═══════════════════════════════════════════════════════════════\n');

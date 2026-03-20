@@ -8,6 +8,9 @@
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;900&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="/shared.css">
+  <script src="/audio.js"></script>
+  <script src="/i18n.js"></script>
+  <script src="/lang.js"></script>
   <script src="/socket.io/socket.io.js"></script>
   <style>
     html, body { overflow: hidden; }
@@ -42,6 +45,29 @@ const stage = document.getElementById('stage');
 let currentState = null;
 let ringRaf = null;
 
+// ── Audio ─────────────────────────────────────────────────────────────────────
+const audio = new AudioManager();
+
+function _doUnlock() {
+  audio.unlock();
+  const overlay = document.getElementById('audio-unlock-overlay');
+  if (overlay) overlay.remove();
+}
+
+document.body.addEventListener('click',   _doUnlock, { once: true });
+document.body.addEventListener('keydown', _doUnlock, { once: true });
+
+// Attempt auto-unlock immediately — works in Firefox and some Chrome configs
+// where the page was activated without a pointer interaction requirement.
+setTimeout(() => {
+  audio.tryAutoUnlock().then(ok => {
+    if (ok) {
+      const overlay = document.getElementById('audio-unlock-overlay');
+      if (overlay) overlay.remove();
+    }
+  });
+}, 300);
+
 // ── Socket connection ─────────────────────────────────────────────────────────
 
 // ── Branding ──────────────────────────────────────────────────────────────────
@@ -57,6 +83,8 @@ let brandingSettings = {};
     if (s.accent_color && /^#[0-9a-fA-F]{6}$/.test(s.accent_color)) {
       document.documentElement.style.setProperty('--accent', s.accent_color);
     }
+    window.applyI18n(s.ui_language || 'en');
+    audio.init(s);
   } catch { /* ignore */ }
 })();
 
@@ -78,7 +106,8 @@ socket.on('lobby-update', (data) => {
   const el = document.getElementById('lobby-player-count');
   if (!el) return;
   if (data.playerCount !== null && data.playerCount !== undefined) {
-    el.textContent = `${data.playerCount} player${data.playerCount !== 1 ? 's' : ''} joined`;
+    const n = data.playerCount;
+    el.textContent = n !== 1 ? t('disp.players_joined_p', { n }) : t('disp.players_joined_s', { n });
     el.style.display = '';
   } else {
     el.style.display = 'none';
@@ -87,20 +116,27 @@ socket.on('lobby-update', (data) => {
 
 socket.on('question-start', (data) => {
   Object.assign(currentState || (currentState = {}), data, { status: 'question' });
+  audio.crossfadeTo(audio.bgmQuestion);
+  audio.play('question-start');
   renderPhase(currentState);
 });
 
 socket.on('question-reveal', (data) => {
   if (currentState) currentState.status = 'reveal';
+  audio.stopMusic();
+  audio.play('reveal');
   renderPhase({ ...currentState, ...data, status: 'reveal' });
 });
 
 socket.on('leaderboard-update', (data) => {
   if (currentState) currentState.status = 'leaderboard';
+  audio.play('leaderboard');
   renderPhase({ ...currentState, ...data, status: 'leaderboard' });
 });
 
 socket.on('game-ended', (data) => {
+  audio.stopMusic();
+  audio.play('game-end');
   renderPhase({ ...data, status: 'ended' });
 });
 
@@ -129,7 +165,7 @@ function renderPhase(state) {
       stage.innerHTML = `
         <div class="text-center">
           <div class="text-6xl mb-4">🎮</div>
-          <h1 class="text-4xl font-black">Waiting for host…</h1>
+          <h1 class="text-4xl font-black">${t('disp.waiting_host')}</h1>
         </div>`;
   }
 }
@@ -142,24 +178,25 @@ function renderLobby(state) {
     : '';
   const pc = state.playerCount;
   const pcHtml = (pc !== null && pc !== undefined)
-    ? `<p id="lobby-player-count" class="text-2xl font-bold text-white/80">${pc} player${pc !== 1 ? 's' : ''} joined</p>`
+    ? `<p id="lobby-player-count" class="text-2xl font-bold text-white/80">${pc !== 1 ? t('disp.players_joined_p', { n: pc }) : t('disp.players_joined_s', { n: pc })}</p>`
     : `<p id="lobby-player-count" class="text-2xl font-bold text-white/80" style="display:none"></p>`;
+  audio.startMusic(audio.bgmLobby);
   stage.innerHTML = `
     <div class="flex flex-col items-center gap-8 w-full max-w-2xl">
       ${logoHtml}
-      <h1 class="text-5xl font-black text-center">Join the game!</h1>
+      <h1 class="text-5xl font-black text-center">${t('disp.join_game')}</h1>
 
       ${state.qrDataUrl
         ? `<img src="${state.qrDataUrl}" alt="QR Code to join" class="rounded-2xl shadow-2xl" style="width:280px;height:280px">`
-        : '<div class="w-64 h-64 bg-white/20 rounded-2xl flex items-center justify-center"><span class="text-white/40 font-bold">No QR</span></div>'
+        : `<div class="w-64 h-64 bg-white/20 rounded-2xl flex items-center justify-center"><span class="text-white/40 font-bold">${t('disp.no_qr')}</span></div>`
       }
 
       <div class="text-center">
-        <p class="text-white/70 font-bold text-xl mb-1">Game PIN</p>
+        <p class="text-white/70 font-bold text-xl mb-1">${t('disp.game_pin')}</p>
         <p class="font-black tracking-widest font-mono" style="font-size:80px;letter-spacing:0.25em">
           ${esc(state.pin || '——')}
         </p>
-        <p class="text-white/60 font-bold text-lg mt-1">or scan the QR code</p>
+        <p class="text-white/60 font-bold text-lg mt-1">${t('disp.scan_qr')}</p>
       </div>
 
       ${pcHtml}
@@ -192,7 +229,7 @@ function renderQuestion(state) {
       <!-- Question header -->
       <div class="flex items-center justify-between px-10 pt-6 pb-4 flex-shrink-0">
         <span class="bg-white/20 px-4 py-2 rounded-full font-black text-lg">
-          Q ${(state.currentQuestionIndex ?? 0) + 1} / ${state.totalQuestions || (state.questions?.length) || '?'}
+          ${t('disp.q_n_of_m', { n: (state.currentQuestionIndex ?? 0) + 1, m: state.totalQuestions || (state.questions?.length) || '?' })}
         </span>
 
         <!-- SVG countdown ring -->
@@ -244,6 +281,8 @@ function startRing(tls, alreadyElapsedMs, circumference) {
   const totalMs = tls * 1000;
   const remaining = Math.max(0, totalMs - alreadyElapsedMs);
   let startTs = null;
+  let lastTickSec = -1;
+  let timeUpPlayed = false;
 
   function frame(ts) {
     if (!startTs) startTs = ts;
@@ -251,7 +290,19 @@ function startRing(tls, alreadyElapsedMs, circumference) {
     const timeLeft = Math.max(0, remaining - elapsed);
     const ratio = timeLeft / totalMs;
     ring.style.strokeDashoffset = circumference * (1 - ratio);
-    timerLabel.textContent = Math.round(1000 * ratio);
+    timerLabel.textContent = Math.ceil(timeLeft / 1000);
+
+    // Audio: tick on each second boundary in last 5s; time-up at 0
+    const secLeft = Math.ceil(timeLeft / 1000);
+    if (timeLeft > 0 && secLeft <= 5 && secLeft !== lastTickSec) {
+      lastTickSec = secLeft;
+      audio.play('tick');
+    }
+    if (timeLeft <= 0 && !timeUpPlayed) {
+      timeUpPlayed = true;
+      audio.play('time-up');
+    }
+
     if (timeLeft > 0 && document.getElementById('ring-circle')) {
       ringRaf = requestAnimationFrame(frame);
     }
@@ -281,7 +332,7 @@ function renderReveal(state) {
 
   stage.innerHTML = `
     <div class="flex flex-col w-full h-screen gap-0 px-10 py-8">
-      <h2 class="text-3xl font-black text-center mb-6">Answer Reveal</h2>
+      <h2 class="text-3xl font-black text-center mb-6">${t('disp.answer_reveal')}</h2>
       <div class="space-y-4 flex-1">
         ${opts.map((opt, i) => `
           <div class="flex items-center gap-4" style="animation: stagger-slide 0.4s ease-out both; animation-delay:${i*100}ms">
@@ -304,7 +355,7 @@ function renderReveal(state) {
           </div>
         `).join('')}
       </div>
-      ${showCounts ? `<p class="text-center text-white/50 font-bold mt-4">${total} answer${total !== 1 ? 's' : ''} received</p>` : ''}
+      ${showCounts ? `<p class="text-center text-white/50 font-bold mt-4">${total !== 1 ? t('disp.answers_p', { n: total }) : t('disp.answers_s', { n: total })}</p>` : ''}
       ${state.explanation ? `<p class="text-center font-bold text-white/80 mt-3 text-xl px-4">${esc(state.explanation)}</p>` : ''}
     </div>
   `;
@@ -327,7 +378,7 @@ function renderLeaderboard(state) {
 
   stage.innerHTML = `
     <div class="flex flex-col w-full max-w-2xl mx-auto gap-6">
-      <h1 class="text-4xl font-black text-center">🏆 Leaderboard</h1>
+      <h1 class="text-4xl font-black text-center">${t('disp.leaderboard')}</h1>
       <div class="space-y-3">
         ${list.map((p, i) => `
           <div class="flex items-center gap-4 bg-white/10 backdrop-blur rounded-2xl px-5 py-3 stagger-slide"
@@ -337,7 +388,7 @@ function renderLeaderboard(state) {
             <span class="text-2xl font-black">${p.score}</span>
           </div>
         `).join('')}
-        ${!list.length ? '<p class="text-center text-white/50 font-bold">No players yet</p>' : ''}
+        ${!list.length ? `<p class="text-center text-white/50 font-bold">${t('disp.no_players')}</p>` : ''}
       </div>
     </div>
   `;
@@ -350,8 +401,8 @@ function renderEnded(state) {
     stage.innerHTML = `
       <div class="text-center">
         <div class="text-6xl mb-4">📁</div>
-        <h1 class="text-4xl font-black">Session Ended</h1>
-        <p class="text-white/60 font-bold mt-3 text-xl">The game has been archived.</p>
+        <h1 class="text-4xl font-black">${t('disp.session_ended')}</h1>
+        <p class="text-white/60 font-bold mt-3 text-xl">${t('disp.game_archived')}</p>
       </div>`;
     return;
   }
@@ -369,7 +420,7 @@ function renderEnded(state) {
 
   stage.innerHTML = `
     <div class="flex flex-col items-center w-full gap-8">
-      <h1 class="text-5xl font-black">🏆 Final Podium</h1>
+      <h1 class="text-5xl font-black">${t('disp.final_podium')}</h1>
 
       <!-- Podium columns -->
       <div class="flex items-end gap-8 justify-center" style="height:340px">
@@ -414,5 +465,18 @@ function esc(str) {
     .replace(/'/g,'&#x27;');
 }
 </script>
+
+<!-- Audio unlock overlay — full-screen, removed after first interaction -->
+<div id="audio-unlock-overlay"
+  style="position:fixed;inset:0;z-index:9999;
+         background:rgba(0,0,0,0.62);backdrop-filter:blur(6px);
+         display:flex;flex-direction:column;align-items:center;
+         justify-content:center;cursor:pointer;user-select:none;">
+  <div style="font-size:6rem;line-height:1;margin-bottom:1.25rem">🔊</div>
+  <p style="color:white;font-family:sans-serif;font-size:2.25rem;font-weight:900;
+            text-align:center;margin:0 0 0.5rem" data-i18n="disp.click_enable_sound">Click to Enable Sound</p>
+  <p style="color:rgba(255,255,255,0.55);font-family:sans-serif;font-size:1rem;
+            font-weight:700;text-align:center;margin:0" data-i18n="disp.press_any_key">or press any key</p>
+</div>
 </body>
 </html>

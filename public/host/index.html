@@ -9,6 +9,9 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="/shared.css">
   <script src="/socket.io/socket.io.js"></script>
+  <script src="/audio.js"></script>
+  <script src="/i18n.js"></script>
+  <script src="/lang.js"></script>
   <style>
     [x-cloak] { display: none !important; }
     .bar-fill { height: 100%; border-radius: 4px; transition: width 0.8s ease-out; }
@@ -41,22 +44,26 @@
 <!-- ── LIBRARY PANEL ──────────────────────────────────────────────────────── -->
 <div id="panel-library" class="max-w-4xl mx-auto p-6">
   <div class="flex items-center justify-between mb-6">
-    <h1 class="text-3xl font-black">🎮 Your Quizzes</h1>
+    <h1 class="text-3xl font-black" data-i18n="host.your_quizzes">🎮 Your Quizzes</h1>
     <div class="flex gap-3">
       <button id="btn-new-quiz"
-        class="bg-white text-purple-800 font-black px-5 py-2 rounded-xl hover:bg-purple-50 transition-colors">
+        class="bg-white text-purple-800 font-black px-5 py-2 rounded-xl hover:bg-purple-50 transition-colors"
+        data-i18n="host.btn_new_quiz">
         ＋ New Quiz
       </button>
       <button onclick="showPanel('settings')"
-        class="bg-white/20 hover:bg-white/30 text-white font-bold px-4 py-2 rounded-xl transition-colors">
+        class="bg-white/20 hover:bg-white/30 text-white font-bold px-4 py-2 rounded-xl transition-colors"
+        data-i18n="host.btn_settings">
         ⚙ Settings
       </button>
       <button onclick="showPanel('history')"
-        class="bg-white/20 hover:bg-white/30 text-white font-bold px-4 py-2 rounded-xl transition-colors">
+        class="bg-white/20 hover:bg-white/30 text-white font-bold px-4 py-2 rounded-xl transition-colors"
+        data-i18n="host.btn_history">
         📊 History
       </button>
       <form method="POST" action="/host/logout" style="display:inline">
-        <button type="submit" class="bg-white/20 hover:bg-white/30 text-white font-bold px-4 py-2 rounded-xl transition-colors">
+        <button type="submit" class="bg-white/20 hover:bg-white/30 text-white font-bold px-4 py-2 rounded-xl transition-colors"
+          data-i18n="host.btn_sign_out">
           Sign Out
         </button>
       </form>
@@ -65,16 +72,19 @@
 
   <!-- New quiz form (hidden by default) -->
   <div id="new-quiz-form" class="hidden bg-white/10 backdrop-blur rounded-2xl p-5 mb-5">
-    <h2 class="text-lg font-black mb-3">Create New Quiz</h2>
+    <h2 class="text-lg font-black mb-3" data-i18n="host.create_new_quiz">Create New Quiz</h2>
     <div class="flex gap-3">
       <input id="new-quiz-name" type="text" maxlength="100" placeholder="Quiz name…"
+        data-i18n-placeholder="host.placeholder_quiz_name"
         class="flex-1 rounded-xl px-4 py-2 text-gray-800 font-bold focus:outline-none focus:ring-2 focus:ring-white">
       <button id="btn-create-quiz"
-        class="bg-white text-purple-800 font-black px-5 py-2 rounded-xl hover:bg-purple-50 transition-colors">
+        class="bg-white text-purple-800 font-black px-5 py-2 rounded-xl hover:bg-purple-50 transition-colors"
+        data-i18n="host.btn_create">
         Create
       </button>
       <button id="btn-cancel-new-quiz"
-        class="bg-white/20 text-white font-bold px-4 py-2 rounded-xl hover:bg-white/30 transition-colors">
+        class="bg-white/20 text-white font-bold px-4 py-2 rounded-xl hover:bg-white/30 transition-colors"
+        data-i18n="host.btn_cancel">
         Cancel
       </button>
     </div>
@@ -91,25 +101,28 @@
 <div id="panel-settings" class="hidden max-w-3xl mx-auto p-6">
   <div class="flex items-center gap-4 mb-6">
     <button onclick="showPanel('library')"
-      class="bg-white/20 hover:bg-white/30 text-white font-bold px-4 py-2 rounded-xl transition-colors">
+      class="bg-white/20 hover:bg-white/30 text-white font-bold px-4 py-2 rounded-xl transition-colors"
+      data-i18n="host.btn_back_quizzes">
       ← Quizzes
     </button>
-    <h1 class="text-3xl font-black">⚙ Settings</h1>
+    <h1 class="text-3xl font-black" data-i18n="host.settings">⚙ Settings</h1>
   </div>
 
   <!-- Tab bar -->
   <div class="flex gap-2 mb-6 flex-wrap">
-    <button onclick="showSettingsTab('general')"   id="stab-general"   class="stab stab-active px-4 py-2 rounded-xl font-bold text-sm transition-colors">🎨 General</button>
-    <button onclick="showSettingsTab('game')"      id="stab-game"      class="stab px-4 py-2 rounded-xl font-bold text-sm transition-colors">🎮 Game</button>
-    <button onclick="showSettingsTab('players')"   id="stab-players"   class="stab px-4 py-2 rounded-xl font-bold text-sm transition-colors">👥 Players</button>
-    <button onclick="showSettingsTab('session')"   id="stab-session"   class="stab px-4 py-2 rounded-xl font-bold text-sm transition-colors">⏱ Session</button>
-    <button onclick="showSettingsTab('security')"  id="stab-security"  class="stab px-4 py-2 rounded-xl font-bold text-sm transition-colors">🔒 Security</button>
+    <button onclick="showSettingsTab('general')"   id="stab-general"   class="stab stab-active px-4 py-2 rounded-xl font-bold text-sm transition-colors" data-i18n="host.stab_general"  >🎨 General</button>
+    <button onclick="showSettingsTab('game')"      id="stab-game"      class="stab px-4 py-2 rounded-xl font-bold text-sm transition-colors" data-i18n="host.stab_game"     >🎮 Game</button>
+    <button onclick="showSettingsTab('players')"   id="stab-players"   class="stab px-4 py-2 rounded-xl font-bold text-sm transition-colors" data-i18n="host.stab_players"  >👥 Players</button>
+    <button onclick="showSettingsTab('session')"   id="stab-session"   class="stab px-4 py-2 rounded-xl font-bold text-sm transition-colors" data-i18n="host.stab_session"  >⏱ Session</button>
+    <button onclick="showSettingsTab('security')"  id="stab-security"  class="stab px-4 py-2 rounded-xl font-bold text-sm transition-colors" data-i18n="host.stab_security" >🔒 Security</button>
+    <button onclick="showSettingsTab('audio')"    id="stab-audio"    class="stab px-4 py-2 rounded-xl font-bold text-sm transition-colors" data-i18n="host.stab_audio"   >🔊 Audio</button>
+    <button onclick="showSettingsTab('language')" id="stab-language" class="stab px-4 py-2 rounded-xl font-bold text-sm transition-colors" data-i18n="host.stab_language">🌐 Language</button>
   </div>
 
   <!-- ── General (Branding) ────────────────────────────────────────────── -->
   <div id="stab-panel-general">
     <div class="bg-white/10 backdrop-blur rounded-2xl p-6 space-y-5">
-      <h2 class="text-xl font-black">Branding</h2>
+      <h2 class="text-xl font-black" data-i18n="host.branding">Branding</h2>
       <div>
         <label class="block text-sm font-bold text-white/70 mb-1">Platform Name</label>
         <input id="s-platform_name" type="text" maxlength="60"
@@ -137,7 +150,8 @@
       </div>
       <div id="s-msg-general" class="hidden rounded-xl px-4 py-3 text-sm font-bold"></div>
       <button onclick="saveSettings('general',['platform_name','logo_url','accent_color'])"
-        class="w-full bg-white text-purple-800 font-black text-lg rounded-xl py-3 hover:bg-purple-50 transition-colors shadow-lg">
+        class="w-full bg-white text-purple-800 font-black text-lg rounded-xl py-3 hover:bg-purple-50 transition-colors shadow-lg"
+        data-i18n="host.btn_save_branding">
         Save Branding
       </button>
     </div>
@@ -146,7 +160,7 @@
   <!-- ── Game Defaults ─────────────────────────────────────────────────── -->
   <div id="stab-panel-game" class="hidden">
     <div class="bg-white/10 backdrop-blur rounded-2xl p-6 space-y-5">
-      <h2 class="text-xl font-black">Game Defaults</h2>
+      <h2 class="text-xl font-black" data-i18n="host.game_defaults">Game Defaults</h2>
       <div class="grid grid-cols-2 gap-4">
         <div>
           <label class="block text-sm font-bold text-white/70 mb-1">Default Time Limit <span class="opacity-60">(sec, 5–120)</span></label>
@@ -173,7 +187,8 @@
       </div>
       <div id="s-msg-game" class="hidden rounded-xl px-4 py-3 text-sm font-bold"></div>
       <button onclick="saveSettings('game',['default_time_limit','max_players','streak_bonus_3','streak_bonus_5'])"
-        class="w-full bg-white text-purple-800 font-black text-lg rounded-xl py-3 hover:bg-purple-50 transition-colors shadow-lg">
+        class="w-full bg-white text-purple-800 font-black text-lg rounded-xl py-3 hover:bg-purple-50 transition-colors shadow-lg"
+        data-i18n="host.btn_save_game">
         Save Game Settings
       </button>
     </div>
@@ -182,7 +197,7 @@
   <!-- ── Players ───────────────────────────────────────────────────────── -->
   <div id="stab-panel-players" class="hidden">
     <div class="bg-white/10 backdrop-blur rounded-2xl p-6 space-y-5">
-      <h2 class="text-xl font-black">Player Experience</h2>
+      <h2 class="text-xl font-black" data-i18n="host.player_experience">Player Experience</h2>
       <label class="flex items-center gap-3 cursor-pointer">
         <input id="s-allow_late_joins" type="checkbox" class="w-5 h-5 rounded accent-purple-600">
         <span class="font-bold">Allow late joins <span class="font-normal text-white/60">— players can join after game starts</span></span>
@@ -197,7 +212,8 @@
       </label>
       <div id="s-msg-players" class="hidden rounded-xl px-4 py-3 text-sm font-bold"></div>
       <button onclick="saveSettings('players',['allow_late_joins','require_nickname_confirm','profanity_filter'])"
-        class="w-full bg-white text-purple-800 font-black text-lg rounded-xl py-3 hover:bg-purple-50 transition-colors shadow-lg">
+        class="w-full bg-white text-purple-800 font-black text-lg rounded-xl py-3 hover:bg-purple-50 transition-colors shadow-lg"
+        data-i18n="host.btn_save_players">
         Save Player Settings
       </button>
     </div>
@@ -206,7 +222,7 @@
   <!-- ── Session Controls ──────────────────────────────────────────────── -->
   <div id="stab-panel-session" class="hidden">
     <div class="bg-white/10 backdrop-blur rounded-2xl p-6 space-y-5">
-      <h2 class="text-xl font-black">Session Controls</h2>
+      <h2 class="text-xl font-black" data-i18n="host.session_controls">Session Controls</h2>
       <div class="grid grid-cols-2 gap-4">
         <div>
           <label class="block text-sm font-bold text-white/70 mb-1">Auto-advance after reveal <span class="opacity-60">(sec, 0 = manual)</span></label>
@@ -234,7 +250,8 @@
       </label>
       <div id="s-msg-session" class="hidden rounded-xl px-4 py-3 text-sm font-bold"></div>
       <button onclick="saveSettings('session',['auto_advance_seconds','reveal_delay_seconds','leaderboard_duration_seconds','show_answer_counts','show_player_count'])"
-        class="w-full bg-white text-purple-800 font-black text-lg rounded-xl py-3 hover:bg-purple-50 transition-colors shadow-lg">
+        class="w-full bg-white text-purple-800 font-black text-lg rounded-xl py-3 hover:bg-purple-50 transition-colors shadow-lg"
+        data-i18n="host.btn_save_session">
         Save Session Settings
       </button>
     </div>
@@ -243,7 +260,7 @@
   <!-- ── Security ──────────────────────────────────────────────────────── -->
   <div id="stab-panel-security" class="hidden">
     <div class="bg-white/10 backdrop-blur rounded-2xl p-6 space-y-5">
-      <h2 class="text-xl font-black">Security</h2>
+      <h2 class="text-xl font-black" data-i18n="host.security">Security</h2>
       <div class="grid grid-cols-2 gap-4">
         <div>
           <label class="block text-sm font-bold text-white/70 mb-1">Session timeout <span class="opacity-60">(hours, 1–24)</span></label>
@@ -258,15 +275,16 @@
       </div>
       <div id="s-msg-security" class="hidden rounded-xl px-4 py-3 text-sm font-bold"></div>
       <button onclick="saveSettings('security',['session_timeout_hours','max_login_attempts'])"
-        class="w-full bg-white text-purple-800 font-black text-lg rounded-xl py-3 hover:bg-purple-50 transition-colors shadow-lg">
+        class="w-full bg-white text-purple-800 font-black text-lg rounded-xl py-3 hover:bg-purple-50 transition-colors shadow-lg"
+        data-i18n="host.btn_save_security">
         Save Security Settings
       </button>
     </div>
 
     <!-- Change Password card -->
     <div class="bg-white/10 backdrop-blur rounded-2xl p-6 mt-4">
-      <h2 class="text-xl font-black mb-1">Change Password</h2>
-      <p class="text-white/60 text-sm font-bold mb-5">Updates take effect immediately and persist across restarts.</p>
+      <h2 class="text-xl font-black mb-1" data-i18n="host.change_password">Change Password</h2>
+      <p class="text-white/60 text-sm font-bold mb-5" data-i18n="host.pw_note">Updates take effect immediately and persist across restarts.</p>
       <div class="space-y-4 max-w-sm">
         <div>
           <label class="block text-sm font-bold text-white/70 mb-1">Current Password</label>
@@ -288,10 +306,122 @@
         </div>
         <div id="settings-pw-msg" class="hidden rounded-xl px-4 py-3 text-sm font-bold"></div>
         <button onclick="changePassword()"
-          class="w-full bg-white text-purple-800 font-black text-lg rounded-xl py-3 hover:bg-purple-50 transition-colors shadow-lg">
+          class="w-full bg-white text-purple-800 font-black text-lg rounded-xl py-3 hover:bg-purple-50 transition-colors shadow-lg"
+          data-i18n="host.btn_update_pw">
           Update Password
         </button>
       </div>
+    </div>
+  </div>
+
+  <!-- ── Audio ──────────────────────────────────────────────────────────── -->
+  <div id="stab-panel-audio" class="hidden">
+    <div class="bg-white/10 backdrop-blur rounded-2xl p-6 space-y-5">
+      <h2 class="text-xl font-black" data-i18n="host.audio_heading">🔊 Audio (Display Screen)</h2>
+      <p class="text-white/60 text-sm font-bold -mt-2" data-i18n="host.audio_note">Sound plays on the projector/display screen only. Players do not hear audio.</p>
+
+      <!-- Master toggle -->
+      <div class="flex items-center justify-between">
+        <label class="font-bold text-white/90" for="s-sound_enabled">Enable Sound</label>
+        <input id="s-sound_enabled" type="checkbox" class="w-5 h-5 accent-purple-400 cursor-pointer">
+      </div>
+
+      <!-- SFX volume -->
+      <div>
+        <label class="block text-sm font-bold text-white/70 mb-1">
+          SFX Volume <span id="s-sfx_volume-label" class="text-white/50 font-normal"></span>
+        </label>
+        <input id="s-sfx_volume" type="range" min="0" max="100" step="1"
+          class="w-full accent-purple-400 cursor-pointer"
+          oninput="document.getElementById('s-sfx_volume-label').textContent = this.value + '%'">
+      </div>
+
+      <!-- Music volume -->
+      <div>
+        <label class="block text-sm font-bold text-white/70 mb-1">
+          Music Volume <span id="s-music_volume-label" class="text-white/50 font-normal"></span>
+        </label>
+        <input id="s-music_volume" type="range" min="0" max="100" step="1"
+          class="w-full accent-purple-400 cursor-pointer"
+          oninput="document.getElementById('s-music_volume-label').textContent = this.value + '%'">
+      </div>
+
+      <!-- SFX pack -->
+      <div>
+        <label class="block text-sm font-bold text-white/70 mb-1">SFX Style</label>
+        <select id="s-sfx_pack"
+          class="w-full rounded-xl px-4 py-3 text-gray-800 font-bold focus:outline-none focus:ring-2 focus:ring-white">
+          <option value="classic">Classic (8-bit square wave)</option>
+          <option value="modern">Modern (smooth sine)</option>
+          <option value="punchy">Punchy (sawtooth)</option>
+          <option value="off">Off (no SFX)</option>
+        </select>
+      </div>
+
+      <!-- Lobby BGM -->
+      <div>
+        <label class="block text-sm font-bold text-white/70 mb-1">Lobby Music</label>
+        <select id="s-bgm_lobby"
+          class="w-full rounded-xl px-4 py-3 text-gray-800 font-bold focus:outline-none focus:ring-2 focus:ring-white">
+          <option value="lobby-chill">Chill (slow arpeggios)</option>
+          <option value="lobby-upbeat">Upbeat (energetic)</option>
+          <option value="off">Off</option>
+        </select>
+      </div>
+
+      <!-- Question BGM -->
+      <div>
+        <label class="block text-sm font-bold text-white/70 mb-1">Question Music</label>
+        <select id="s-bgm_question"
+          class="w-full rounded-xl px-4 py-3 text-gray-800 font-bold focus:outline-none focus:ring-2 focus:ring-white">
+          <option value="question-action">Action (driving, intense)</option>
+          <option value="question-electronic">Electronic (pulsing)</option>
+          <option value="off">Off</option>
+        </select>
+      </div>
+
+      <div id="s-msg-audio" class="hidden rounded-xl px-4 py-3 text-sm font-bold"></div>
+      <button onclick="saveSettings('audio',['sound_enabled','sfx_volume','music_volume','sfx_pack','bgm_lobby','bgm_question'])"
+        class="w-full bg-white text-purple-800 font-black text-lg rounded-xl py-3 hover:bg-purple-50 transition-colors shadow-lg"
+        data-i18n="host.btn_save_audio">
+        Save Audio Settings
+      </button>
+
+      <!-- Test & instructions -->
+      <div class="border-t border-white/15 pt-5 space-y-3">
+        <p class="text-sm font-bold text-white/55" data-i18n="host.audio_info">
+          ℹ️  Game audio plays on the <strong>display screen</strong> (<code class="bg-white/10 px-1 rounded">/display?pin=…</code>).
+          Open that page on your projector/TV, then click or press a key on it once to unlock browser audio.
+        </p>
+        <button onclick="testHostAudio()"
+          class="bg-white/20 hover:bg-white/35 text-white font-bold px-5 py-2 rounded-xl transition-colors text-sm"
+          data-i18n="host.btn_test_sound">
+          🔔 Test Sound in This Browser
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Language ─────────────────────────────────────────────────────── -->
+  <div id="stab-panel-language" class="hidden">
+    <div class="bg-white/10 backdrop-blur rounded-2xl p-6 space-y-5">
+      <h2 class="text-xl font-black" data-i18n="host.language_heading">🌐 Language / Idioma</h2>
+      <p class="text-white/60 text-sm font-bold -mt-2" data-i18n="host.language_note">Applies to all screens: host, display, and players.</p>
+      <div>
+        <label class="block text-sm font-bold text-white/70 mb-1" for="s-ui_language" data-i18n="host.language_label">Interface Language</label>
+        <select id="s-ui_language"
+          class="w-full max-w-xs rounded-xl px-4 py-3 text-gray-800 font-bold focus:outline-none focus:ring-2 focus:ring-white"
+          onchange="window.applyI18n(this.value)">
+          <option value="en" data-i18n="host.language_opt_en">English</option>
+          <option value="es" data-i18n="host.language_opt_es">Español</option>
+        </select>
+      </div>
+      <div id="s-msg-language" class="hidden rounded-xl px-4 py-3 text-sm font-bold"></div>
+      <button onclick="saveSettings('language',['ui_language'])"
+        class="w-full bg-white text-purple-800 font-black text-lg rounded-xl py-3 hover:bg-purple-50 transition-colors shadow-lg"
+        data-i18n="host.btn_save_language">
+        Save Language
+      </button>
     </div>
   </div>
 </div>
@@ -300,10 +430,11 @@
 <div id="panel-history" class="hidden max-w-4xl mx-auto p-6">
   <div class="flex items-center gap-4 mb-6">
     <button onclick="showPanel('library')"
-      class="bg-white/20 hover:bg-white/30 text-white font-bold px-4 py-2 rounded-xl transition-colors">
+      class="bg-white/20 hover:bg-white/30 text-white font-bold px-4 py-2 rounded-xl transition-colors"
+      data-i18n="host.btn_back_quizzes">
       ← Quizzes
     </button>
-    <h1 class="text-3xl font-black">📊 Session History</h1>
+    <h1 class="text-3xl font-black" data-i18n="host.session_history">📊 Session History</h1>
   </div>
   <div id="history-list" class="space-y-3">
     <p class="text-white/40 font-bold text-center py-8">Loading…</p>
@@ -317,12 +448,12 @@
     <!-- Left: status sidebar -->
     <div class="col-span-1 flex flex-col gap-4">
       <div class="bg-white/10 backdrop-blur rounded-2xl p-4">
-        <div class="text-xs font-bold text-white/60 uppercase tracking-wide mb-1">Session PIN</div>
+        <div class="text-xs font-bold text-white/60 uppercase tracking-wide mb-1" data-i18n="host.session_pin">Session PIN</div>
         <div id="game-pin" class="text-5xl font-black tracking-widest font-mono text-center py-2">——</div>
         <img id="qr-img" src="" alt="QR Code" class="w-32 h-32 mx-auto rounded-xl mt-2">
       </div>
       <div class="bg-white/10 backdrop-blur rounded-2xl p-4 flex-1">
-        <div class="text-xs font-bold text-white/60 uppercase tracking-wide mb-2">Players</div>
+        <div class="text-xs font-bold text-white/60 uppercase tracking-wide mb-2" data-i18n="host.players_label">Players</div>
         <div id="player-count" class="text-3xl font-black">0</div>
         <div id="player-chips" class="flex flex-wrap gap-2 mt-3 max-h-48 overflow-y-auto"></div>
       </div>
@@ -406,11 +537,11 @@
       <!-- Live participation grid (flex-1) -->
       <div class="bg-white/10 backdrop-blur rounded-2xl p-5 flex-1 flex flex-col min-h-0 gap-3">
         <div id="response-placeholder" class="flex-1 flex items-center justify-center">
-          <p class="text-white/30 font-bold text-sm text-center">Live responses appear here during questions</p>
+          <p class="text-white/30 font-bold text-sm text-center" data-i18n="host.live_responses">Live responses appear here during questions</p>
         </div>
         <div id="response-grid" style="display:none" class="flex-1 flex flex-col gap-3 min-h-0">
           <div class="flex items-center justify-between shrink-0">
-            <span class="text-xs font-bold text-white/60 uppercase tracking-wide">Responses</span>
+            <span class="text-xs font-bold text-white/60 uppercase tracking-wide" data-i18n="host.responses">Responses</span>
             <span id="response-counter" class="text-sm font-black">0 / 0</span>
           </div>
           <div id="response-chips" class="flex flex-wrap gap-2 content-start overflow-y-auto flex-1 min-h-0"></div>
@@ -424,7 +555,8 @@
           Start First Question
         </button>
         <button id="btn-end-game"
-          class="hidden bg-white/20 text-white font-bold px-6 rounded-2xl hover:bg-white/30 transition-colors">
+          class="hidden bg-white/20 text-white font-bold px-6 rounded-2xl hover:bg-white/30 transition-colors"
+          data-i18n="host.btn_end_game">
           End Game
         </button>
       </div>
@@ -450,6 +582,15 @@ let currentOptions = [];
 let hostRingRaf = null;
 let timesUpTimeout = null;
 let _countdownInterval = null; // auto-advance countdown on the primary button
+
+// ── Host-side audio (plays in the host's own browser) ────────────────────
+const hostAudio = new AudioManager();
+(async () => {
+  try {
+    const r = await fetch('/api/settings/public');
+    if (r.ok) hostAudio.init(await r.json());
+  } catch {}
+})();
 
 function _clearCountdown() {
   if (_countdownInterval) { clearInterval(_countdownInterval); _countdownInterval = null; }
@@ -485,12 +626,23 @@ function startHostRing(tls) {
   ring.style.strokeDashoffset = '0';
   const totalMs = tls * 1000;
   const startTs = performance.now();
+  let lastTickSec = -1;
+  let timeUpPlayed = false;
   function frame(ts) {
     const elapsed  = ts - startTs;
     const timeLeft = Math.max(0, totalMs - elapsed);
     const ratio    = timeLeft / totalMs;
     ring.style.strokeDashoffset  = HOST_RING_CIRCUMFERENCE * (1 - ratio);
-    label.textContent = Math.round(1000 * ratio);
+    label.textContent = Math.ceil(timeLeft / 1000);
+    const secLeft = Math.ceil(timeLeft / 1000);
+    if (timeLeft > 0 && secLeft <= 5 && secLeft !== lastTickSec) {
+      lastTickSec = secLeft;
+      hostAudio.play('tick');
+    }
+    if (timeLeft <= 0 && !timeUpPlayed) {
+      timeUpPlayed = true;
+      hostAudio.play('time-up');
+    }
     if (timeLeft > 0 && document.getElementById('host-ring-circle')) {
       hostRingRaf = requestAnimationFrame(frame);
     }
@@ -537,6 +689,26 @@ function showPanel(name) {
   if (name === 'history') loadHistory();
 }
 
+function testHostAudio() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc  = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.type = 'square';
+    const t = ctx.currentTime;
+    const notes = [523, 659, 784, 1047]; // C E G C
+    notes.forEach((f, i) => {
+      osc.frequency.setValueAtTime(f, t + i * 0.12);
+    });
+    gain.gain.setValueAtTime(0.45, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.65);
+    osc.start(t); osc.stop(t + 0.7);
+  } catch (e) {
+    console.error('Audio test failed:', e);
+  }
+}
+
 async function changePassword() {
   const currentPassword = document.getElementById('settings-current-pw').value;
   const newPassword     = document.getElementById('settings-new-pw').value;
@@ -554,17 +726,17 @@ async function changePassword() {
     const data = await res.json();
     if (res.ok) {
       msg.classList.add('bg-green-500/20', 'text-green-200');
-      msg.textContent = '✓ Password updated successfully';
+      msg.textContent = t('host.pw_updated');
       document.getElementById('settings-current-pw').value = '';
       document.getElementById('settings-new-pw').value = '';
       document.getElementById('settings-confirm-pw').value = '';
     } else {
       msg.classList.add('bg-red-500/20', 'text-red-200');
-      msg.textContent = data.error || 'Something went wrong';
+      msg.textContent = data.error || t('host.network_error');
     }
   } catch {
     msg.classList.add('bg-red-500/20', 'text-red-200');
-    msg.textContent = 'Network error — try again';
+    msg.textContent = t('host.network_error');
   }
 }
 
@@ -573,7 +745,7 @@ async function changePassword() {
 let _defaultTimeLimit = 20; // updated from settings when panel loads
 
 function showSettingsTab(tab) {
-  ['general','game','players','session','security'].forEach(t => {
+  ['general','game','players','session','security','audio','language'].forEach(t => {
     document.getElementById(`stab-panel-${t}`).classList.toggle('hidden', t !== tab);
     document.getElementById(`stab-${t}`).classList.toggle('stab-active', t === tab);
   });
@@ -589,16 +761,22 @@ async function loadSettingsPanel() {
     ['platform_name','logo_url','accent_color',
      'default_time_limit','max_players','streak_bonus_3','streak_bonus_5',
      'auto_advance_seconds','reveal_delay_seconds','leaderboard_duration_seconds',
-     'session_timeout_hours','max_login_attempts'].forEach(key => {
+     'session_timeout_hours','max_login_attempts',
+     'sfx_volume','music_volume','sfx_pack','bgm_lobby','bgm_question'].forEach(key => {
       const el = document.getElementById(`s-${key}`);
       if (el) el.value = s[key] ?? '';
     });
     // Checkboxes
     ['allow_late_joins','require_nickname_confirm','profanity_filter',
-     'show_answer_counts','show_player_count'].forEach(key => {
+     'show_answer_counts','show_player_count','sound_enabled'].forEach(key => {
       const el = document.getElementById(`s-${key}`);
       if (el) el.checked = s[key] === 'true';
     });
+    // Language selector
+    const langEl = document.getElementById('s-ui_language');
+    if (langEl && s.ui_language) langEl.value = s.ui_language;
+    // Apply i18n to the whole page
+    window.applyI18n(s.ui_language || 'en');
     // Sync color picker
     const accentEl = document.getElementById('s-accent_color');
     const picker   = document.getElementById('s-accent_color_picker');
@@ -609,6 +787,11 @@ async function loadSettingsPanel() {
     }
     // Cache default time limit for new questions
     if (s.default_time_limit) _defaultTimeLimit = parseInt(s.default_time_limit, 10) || 20;
+    // Update volume slider labels
+    const sfxVolEl   = document.getElementById('s-sfx_volume');
+    const musicVolEl = document.getElementById('s-music_volume');
+    if (sfxVolEl)   document.getElementById('s-sfx_volume-label').textContent   = sfxVolEl.value   + '%';
+    if (musicVolEl) document.getElementById('s-music_volume-label').textContent = musicVolEl.value + '%';
     // Live preview on text input change
     if (accentEl) {
       accentEl.oninput = () => {
@@ -641,7 +824,7 @@ async function saveSettings(tabName, keys) {
     const data = await res.json();
     if (res.ok) {
       msgEl.classList.add('bg-green-500/20', 'text-green-200');
-      msgEl.textContent = '✓ Settings saved';
+      msgEl.textContent = t('host.settings_saved');
     } else {
       const errs = data.errors ? Object.values(data.errors).join('; ') : data.error || 'Error';
       msgEl.classList.add('bg-red-500/20', 'text-red-200');
@@ -649,7 +832,7 @@ async function saveSettings(tabName, keys) {
     }
   } catch {
     msgEl.classList.add('bg-red-500/20', 'text-red-200');
-    msgEl.textContent = 'Network error — try again';
+    msgEl.textContent = t('host.network_error');
   }
   setTimeout(() => msgEl.classList.add('hidden'), 4000);
 }
@@ -668,7 +851,7 @@ function renderQuizList(quizzes) {
     el.innerHTML = `
       <div class="bg-white/10 backdrop-blur rounded-2xl p-8 text-center">
         <div class="text-4xl mb-3">📝</div>
-        <p class="font-bold text-white/70">No quizzes yet. Create your first one!</p>
+        <p class="font-bold text-white/70">${t('host.no_quizzes')}</p>
       </div>`;
     return;
   }
@@ -707,7 +890,7 @@ function renderQuizList(quizzes) {
       <div class="question-list mt-3 space-y-2" data-quiz-id="${q.id}"></div>
       <button onclick="toggleQuizExpand(${q.id}, this)"
         class="text-white/60 hover:text-white text-sm font-bold transition-colors mt-2">
-        ▾ Show Questions
+        ${t('host.show_questions')}
       </button>
     </div>
   `).join('');
@@ -717,14 +900,14 @@ async function toggleQuizExpand(quizId, btn) {
   const container = document.querySelector(`.question-list[data-quiz-id="${quizId}"]`);
   if (container.dataset.loaded) {
     container.classList.toggle('hidden');
-    btn.textContent = container.classList.contains('hidden') ? '▾ Show Questions' : '▴ Hide Questions';
+    btn.textContent = container.classList.contains('hidden') ? t('host.show_questions') : t('host.hide_questions');
     return;
   }
   const res = await apiFetch(`/host/api/quizzes/${quizId}`);
   const quiz = await res.json();
   container.dataset.loaded = '1';
   renderQuestions(quizId, quiz.questions);
-  btn.textContent = '▴ Hide Questions';
+  btn.textContent = t('host.hide_questions');
 }
 
 function renderQuestions(quizId, questions) {
@@ -732,21 +915,21 @@ function renderQuestions(quizId, questions) {
   const addBtn = `
     <button onclick="showAddQuestionForm(${quizId})"
       class="w-full bg-white/10 hover:bg-white/20 text-white font-bold py-2 rounded-xl text-sm transition-colors mt-2">
-      ＋ Add Question
+      ${t('host.btn_add_question')}
     </button>
     <div id="add-q-form-${quizId}" class="hidden"></div>
   `;
 
   if (!questions.length) {
-    container.innerHTML = `<p class="text-white/40 text-sm">No questions yet.</p>` + addBtn;
+    container.innerHTML = `<p class="text-white/40 text-sm">${t('host.no_questions')}</p>` + addBtn;
     return;
   }
 
   const TILE_LABELS = [
-    { shape: '▲', color: '#E21B3C', label: 'Red' },
-    { shape: '◆', color: '#1368CE', label: 'Blue' },
-    { shape: '●', color: '#D89E00', label: 'Yellow' },
-    { shape: '■', color: '#26890C', label: 'Green' },
+    { shape: '▲', color: '#E21B3C', label: t('host.tile_red')   },
+    { shape: '◆', color: '#1368CE', label: t('host.tile_blue')  },
+    { shape: '●', color: '#D89E00', label: t('host.tile_yellow')},
+    { shape: '■', color: '#26890C', label: t('host.tile_green') },
   ];
 
   container.innerHTML = questions.map((q, i) => `
@@ -775,28 +958,28 @@ function _questionFormHTML(quizId, qData = null) {
   const isEdit = qData !== null;
   const v = qData || { text: '', options: ['','','',''], correct_index: 0, time_limit_seconds: _defaultTimeLimit, type: 'mcq', image_url: null, explanation: null };
   const TILE_COLORS = ['#E21B3C','#1368CE','#D89E00','#26890C'];
-  const TILE_LABELS = ['Red ▲','Blue ◆','Yellow ●','Green ■'];
   const isTF = v.type === 'truefalse';
+  const TILE_FORM_LABELS = [t('host.tile_red'), t('host.tile_blue'), t('host.tile_yellow'), t('host.tile_green')];
 
   return `
     <div class="bg-white/5 rounded-xl p-4 mt-2 space-y-3">
       <div class="flex gap-4 flex-wrap">
         <div class="flex-1 min-w-0">
-          <label class="text-xs text-white/60 font-bold">Question</label>
+          <label class="text-xs text-white/60 font-bold">${t('host.qf_question_label')}</label>
           <textarea class="qf-text w-full mt-1 rounded-lg px-3 py-2 text-gray-800 font-bold text-sm focus:outline-none resize-none" rows="2" maxlength="300">${esc(v.text)}</textarea>
         </div>
         <div>
-          <label class="text-xs text-white/60 font-bold block">Type</label>
+          <label class="text-xs text-white/60 font-bold block">${t('host.qf_type_label')}</label>
           <select class="qf-type mt-1 rounded-lg px-3 py-2 text-gray-800 font-bold text-sm focus:outline-none">
-            <option value="mcq" ${!isTF ? 'selected' : ''}>Multiple Choice</option>
-            <option value="truefalse" ${isTF ? 'selected' : ''}>True / False</option>
+            <option value="mcq" ${!isTF ? 'selected' : ''}>${t('host.qf_mcq')}</option>
+            <option value="truefalse" ${isTF ? 'selected' : ''}>${t('host.qf_truefalse')}</option>
           </select>
         </div>
       </div>
       <div class="grid grid-cols-2 gap-2">
         ${[0,1,2,3].map(i => `
           <div class="qf-opt-wrap-${i} rounded-lg p-2" style="background:${TILE_COLORS[i]};display:${isTF && i >= 2 ? 'none' : ''}">
-            <label class="text-xs text-white/80 font-bold">${isTF ? (i === 0 ? 'True' : 'False') : TILE_LABELS[i]}</label>
+            <label class="text-xs text-white/80 font-bold">${isTF ? (i === 0 ? 'True' : 'False') : TILE_FORM_LABELS[i]}</label>
             <input class="qf-opt-${i} w-full mt-1 rounded px-2 py-1 text-gray-800 font-bold text-sm focus:outline-none" type="text" maxlength="90"
               value="${esc(isTF ? (i === 0 ? 'True' : i === 1 ? 'False' : '') : (v.options||[])[i]||'')}" ${isTF && i < 2 ? 'readonly' : ''}>
           </div>
@@ -804,32 +987,32 @@ function _questionFormHTML(quizId, qData = null) {
       </div>
       <div class="flex gap-4 flex-wrap">
         <div>
-          <label class="text-xs text-white/60 font-bold">Correct Answer</label>
+          <label class="text-xs text-white/60 font-bold">${t('host.qf_correct_label')}</label>
           <select class="qf-correct mt-1 rounded-lg px-3 py-2 text-gray-800 font-bold text-sm focus:outline-none">
             ${isTF
               ? ['True','False'].map((l,i) => `<option value="${i}" ${v.correct_index===i?'selected':''}>${l}</option>`).join('')
-              : TILE_LABELS.map((l,i) => `<option value="${i}" ${v.correct_index===i?'selected':''}>${l}</option>`).join('')
+              : TILE_FORM_LABELS.map((l,i) => `<option value="${i}" ${v.correct_index===i?'selected':''}>${l}</option>`).join('')
             }
           </select>
         </div>
         <div>
-          <label class="text-xs text-white/60 font-bold">Time (seconds)</label>
+          <label class="text-xs text-white/60 font-bold">${t('host.qf_time_label')}</label>
           <input class="qf-time mt-1 w-24 rounded-lg px-3 py-2 text-gray-800 font-bold text-sm focus:outline-none" type="number" min="5" max="120" value="${v.time_limit_seconds || 20}">
         </div>
       </div>
       <div>
-        <label class="text-xs text-white/60 font-bold">Image URL <span class="font-normal opacity-60">(optional)</span></label>
+        <label class="text-xs text-white/60 font-bold">${t('host.qf_image_label')} <span class="font-normal opacity-60">${t('host.qf_optional')}</span></label>
         <input class="qf-image w-full mt-1 rounded-lg px-3 py-2 text-gray-800 font-bold text-sm focus:outline-none" type="url"
           placeholder="https://example.com/image.jpg" value="${esc(v.image_url||'')}">
       </div>
       <div>
-        <label class="text-xs text-white/60 font-bold">Explanation <span class="font-normal opacity-60">(shown after reveal, optional)</span></label>
+        <label class="text-xs text-white/60 font-bold">${t('host.qf_explanation_label')} <span class="font-normal opacity-60">${t('host.qf_explanation_note')}</span></label>
         <textarea class="qf-explanation w-full mt-1 rounded-lg px-3 py-2 text-gray-800 font-bold text-sm focus:outline-none resize-none" rows="2" maxlength="400">${esc(v.explanation||'')}</textarea>
       </div>
       <p class="qf-error hidden text-red-300 text-xs font-bold"></p>
       <div class="flex gap-2">
-        <button class="qf-save bg-white text-purple-800 font-black px-4 py-2 rounded-xl text-sm hover:bg-purple-50 transition-colors">Save Question</button>
-        <button class="qf-cancel bg-white/20 text-white font-bold px-3 py-2 rounded-xl text-sm hover:bg-white/30 transition-colors">Cancel</button>
+        <button class="qf-save bg-white text-purple-800 font-black px-4 py-2 rounded-xl text-sm hover:bg-purple-50 transition-colors">${t('host.qf_btn_save')}</button>
+        <button class="qf-cancel bg-white/20 text-white font-bold px-3 py-2 rounded-xl text-sm hover:bg-white/30 transition-colors">${t('host.qf_btn_cancel')}</button>
       </div>
     </div>
   `;
@@ -923,7 +1106,6 @@ function _setupTypeToggle(formEl) {
   function applyMode() {
     const isTF = typeSelect.value === 'truefalse';
     const correctSel = formEl.querySelector('.qf-correct');
-    const TILE_LABELS  = ['Red ▲','Blue ◆','Yellow ●','Green ■'];
     [0,1,2,3].forEach(i => {
       const wrap = formEl.querySelector(`.qf-opt-wrap-${i}`);
       const inp  = formEl.querySelector(`.qf-opt-${i}`);
@@ -937,7 +1119,7 @@ function _setupTypeToggle(formEl) {
         inp.readOnly = false;
       }
     });
-    const labels = isTF ? ['True','False'] : TILE_LABELS;
+    const labels = isTF ? ['True','False'] : [t('host.tile_red'), t('host.tile_blue'), t('host.tile_yellow'), t('host.tile_green')];
     const maxIdx = isTF ? 2 : 4;
     const curVal = Number(correctSel.value);
     correctSel.innerHTML = Array.from({length: maxIdx}, (_, i) =>
@@ -948,7 +1130,7 @@ function _setupTypeToggle(formEl) {
 }
 
 async function deleteQuestion(quizId, questionId) {
-  if (!confirm('Delete this question?')) return;
+  if (!confirm(t('host.confirm_delete_q'))) return;
   await apiFetch(`/host/api/questions/${questionId}`, { method: 'DELETE' });
   await reloadQuizCard(quizId);
 }
@@ -989,7 +1171,7 @@ async function submitRenameQuiz(quizId) {
 }
 
 async function deleteQuiz(quizId) {
-  if (!confirm('Delete this quiz and all its questions?')) return;
+  if (!confirm(t('host.confirm_delete_quiz'))) return;
   await apiFetch(`/host/api/quizzes/${quizId}`, { method: 'DELETE' });
   await loadQuizzes();
 }
@@ -1001,11 +1183,11 @@ async function duplicateQuiz(quizId) {
 }
 
 async function loadHistory() {
-  document.getElementById('history-list').innerHTML = '<p class="text-white/40 font-bold text-center py-8">Loading…</p>';
+  document.getElementById('history-list').innerHTML = `<p class="text-white/40 font-bold text-center py-8">${t('host.loading')}</p>`;
   const res = await apiFetch('/host/api/sessions');
   const sessions = await res.json();
   if (!sessions.length) {
-    document.getElementById('history-list').innerHTML = '<p class="text-white/40 font-bold text-center py-8">No completed games yet.</p>';
+    document.getElementById('history-list').innerHTML = `<p class="text-white/40 font-bold text-center py-8">${t('host.no_sessions')}</p>`;
     return;
   }
   document.getElementById('history-list').innerHTML = sessions.map(s => `
@@ -1020,7 +1202,7 @@ async function loadHistory() {
         </div>
         <button onclick="toggleSessionDetail(${s.id}, this)"
           class="bg-white/20 hover:bg-white/30 text-white font-bold px-3 py-1.5 rounded-xl text-sm transition-colors">
-          ▼ Details
+          ${t('host.btn_details')}
         </button>
       </div>
       <div id="session-detail-${s.id}" class="hidden mt-3"></div>
@@ -1032,7 +1214,7 @@ async function toggleSessionDetail(sessionId, btn) {
   const el = document.getElementById(`session-detail-${sessionId}`);
   if (el.dataset.loaded) {
     el.classList.toggle('hidden');
-    btn.textContent = el.classList.contains('hidden') ? '▼ Details' : '▲ Details';
+    btn.textContent = el.classList.contains('hidden') ? t('host.btn_details') : t('host.btn_hide_details');
     return;
   }
   const res = await apiFetch(`/host/api/sessions/${sessionId}`);
@@ -1058,9 +1240,9 @@ async function toggleSessionDetail(sessionId, btn) {
         </div>
       </div>
     `;
-  }).join('') || '<p class="text-white/40 text-sm">No submissions recorded.</p>';
+  }).join('') || `<p class="text-white/40 text-sm">${t('host.no_submissions')}</p>`;
   el.classList.remove('hidden');
-  btn.textContent = '▲ Details';
+  btn.textContent = t('host.btn_hide_details');
 }
 
 document.getElementById('btn-new-quiz').onclick = () => {
@@ -1109,19 +1291,23 @@ async function startSession(quizId, quizName) {
   const qrImg = document.getElementById('qr-img');
   qrImg.src = data.qrDataUrl;
   qrImg.alt = `Join at ${data.pin}`;
-  document.getElementById('phase-badge').textContent = 'Lobby';
+  document.getElementById('phase-badge').textContent = t('host.phase_lobby');
   document.getElementById('question-progress').textContent = '';
   document.getElementById('question-display').innerHTML =
-    `<p class="font-bold text-white/50 text-center text-3xl">Waiting for players to join…</p>`;
+    `<p class="font-bold text-white/50 text-center text-3xl">${t('host.waiting_players')}</p>`;
   document.getElementById('tally-bars').classList.add('hidden');
-  document.getElementById('btn-primary-action').textContent = 'Start First Question';
+  document.getElementById('btn-primary-action').textContent = t('host.btn_start_first');
   document.getElementById('btn-end-game').classList.remove('hidden');
   document.getElementById('leaderboard-sidebar').innerHTML =
-    `<div class="text-xs font-bold text-white/60 uppercase tracking-wide mb-2">Leaderboard</div>
-     <p class="text-white/40 text-sm">Starts after first reveal</p>`;
+    `<div class="text-xs font-bold text-white/60 uppercase tracking-wide mb-2">${t('host.leaderboard_label')}</div>
+     <p class="text-white/40 text-sm">${t('host.starts_after_reveal')}</p>`;
 
   showPanel('game');
   _connectSocket();
+
+  // Unlock host audio on this button-click gesture and start lobby music
+  hostAudio.unlock();
+  hostAudio.startMusic(hostAudio.bgmLobby);
 }
 
 // ── Socket.io ─────────────────────────────────────────────────────────────────
@@ -1147,10 +1333,12 @@ function _connectSocket() {
     currentStatus = 'question';
     currentQuestionIndex = data.questionIndex;
     currentOptions = data.options;
-    document.getElementById('phase-badge').textContent = 'Question';
+    hostAudio.crossfadeTo(hostAudio.bgmQuestion);
+    hostAudio.play('question-start');
+    document.getElementById('phase-badge').textContent = t('host.phase_question');
     document.getElementById('reveal-explanation').classList.add('hidden');
     document.getElementById('question-progress').textContent =
-      `Q ${data.questionIndex + 1} / ${data.totalQuestions}`;
+      t('host.q_n_of_m', { n: data.questionIndex + 1, m: data.totalQuestions });
     const imgHtml = data.imageUrl
       ? `<img src="${esc(data.imageUrl)}" alt="" class="max-h-32 rounded-xl object-cover mx-auto mb-3" onerror="this.remove()">`
       : '';
@@ -1209,7 +1397,9 @@ function _connectSocket() {
     cancelHostRing();
     _clearCountdown();
     currentStatus = 'reveal';
-    document.getElementById('phase-badge').textContent = 'Reveal';
+    hostAudio.stopMusic();
+    hostAudio.play('reveal');
+    document.getElementById('phase-badge').textContent = t('host.phase_reveal');
     // Highlight correct answer tile
     for (let i = 0; i < 4; i++) {
       const bar = document.getElementById(`tally-bar-${i}`);
@@ -1236,10 +1426,10 @@ function _connectSocket() {
         }
       });
     }
-    document.getElementById('btn-primary-action').textContent = 'Next →';
+    document.getElementById('btn-primary-action').textContent = t('host.btn_next');
     // If auto-advance is configured, show a countdown on the button
     if (data.autoAdvanceSeconds > 0) {
-      _startButtonCountdown(data.autoAdvanceSeconds, 'Next →');
+      _startButtonCountdown(data.autoAdvanceSeconds, t('host.btn_next'));
     }
     const explEl = document.getElementById('reveal-explanation');
     if (data.explanation) {
@@ -1253,30 +1443,33 @@ function _connectSocket() {
   socket.on('leaderboard-update', (data) => {
     cancelHostRing();
     _clearCountdown();
+    hostAudio.play('leaderboard');
     document.getElementById('tally-bars').classList.add('hidden');
     document.getElementById('reveal-explanation').classList.add('hidden');
     document.getElementById('response-grid').style.display = 'none';
     document.getElementById('response-placeholder').classList.remove('hidden');
     currentStatus = 'leaderboard';
-    document.getElementById('phase-badge').textContent = 'Leaderboard';
-    document.getElementById('btn-primary-action').textContent = 'Next Question';
+    document.getElementById('phase-badge').textContent = t('host.phase_leaderboard');
+    document.getElementById('btn-primary-action').textContent = t('host.btn_next_question');
     renderLeaderboardSidebar(data.leaderboard);
     // If leaderboard auto-advance is configured, show a countdown on the button
     if (data.leaderboardDurationSeconds > 0) {
-      _startButtonCountdown(data.leaderboardDurationSeconds, 'Next Question');
+      _startButtonCountdown(data.leaderboardDurationSeconds, t('host.btn_next_question'));
     }
   });
 
   socket.on('game-ended', (data) => {
     cancelHostRing();
     _clearCountdown();
+    hostAudio.stopMusic();
+    hostAudio.play('game-end');
     document.getElementById('tally-bars').classList.add('hidden');
     document.getElementById('reveal-explanation').classList.add('hidden');
     document.getElementById('response-grid').style.display = 'none';
     document.getElementById('response-placeholder').classList.remove('hidden');
     currentStatus = 'ended';
-    document.getElementById('phase-badge').textContent = 'Ended 🏆';
-    document.getElementById('btn-primary-action').textContent = 'Back to Quizzes';
+    document.getElementById('phase-badge').textContent = t('host.phase_ended');
+    document.getElementById('btn-primary-action').textContent = t('host.btn_back_to_quizzes');
     document.getElementById('btn-end-game').classList.add('hidden');
     document.getElementById('question-display').innerHTML = _renderPodium(data.podium);
     renderLeaderboardSidebar(data.allPlayers);
@@ -1298,7 +1491,7 @@ function updatePlayerChips(players) {
 function renderLeaderboardSidebar(list) {
   if (!list || !list.length) return;
   const el = document.getElementById('leaderboard-sidebar');
-  el.innerHTML = `<div class="text-xs font-bold text-white/60 uppercase tracking-wide mb-2">Leaderboard</div>` +
+  el.innerHTML = `<div class="text-xs font-bold text-white/60 uppercase tracking-wide mb-2">${t('host.leaderboard_label')}</div>` +
     list.slice(0, 10).map((p, i) => `
       <div class="flex items-center gap-2 py-1 stagger-slide" style="animation-delay:${i*80}ms">
         <span class="text-white/50 font-black w-6 text-right text-sm">${p.rank || i+1}</span>
@@ -1340,6 +1533,7 @@ document.getElementById('btn-primary-action').onclick = async () => {
   _clearCountdown(); // host clicked manually — cancel any running countdown
   if (currentStatus === 'ended') {
     showPanel('library');
+    hostAudio.stopMusic();
     socket && socket.disconnect();
     socket = null;
     activePin = null;
@@ -1350,7 +1544,7 @@ document.getElementById('btn-primary-action').onclick = async () => {
 };
 
 document.getElementById('btn-end-game').onclick = async () => {
-  if (!confirm('End the game now?')) return;
+  if (!confirm(t('host.confirm_end_game'))) return;
   await apiFetch('/host/api/session/end', { method: 'POST' });
 };
 
@@ -1381,6 +1575,16 @@ function esc(str) {
 }
 
 // ── Init ───────────────────────────────────────────────────────────────────────
+// Apply language from public settings immediately (before the settings panel loads)
+(async () => {
+  try {
+    const r = await fetch('/api/settings/public');
+    if (r.ok) {
+      const s = await r.json();
+      window.applyI18n(s.ui_language || 'en');
+    }
+  } catch { /* ignore */ }
+})();
 loadQuizzes();
 </script>
 </body>

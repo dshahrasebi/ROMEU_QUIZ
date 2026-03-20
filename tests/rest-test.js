@@ -417,6 +417,106 @@ async function testDeleteCleanup(quizId, dupQuizId) {
 
 // ── runner ─────────────────────────────────────────────────────────────────────
 
+async function testAudioSettings() {
+  console.log('\n── Audio Settings ────────────────────────────────────────────────');
+
+  // GET /api/settings/public includes all 6 sound keys with defaults
+  const pub = await req({ path: '/api/settings/public', method: 'GET' });
+  check('GET /api/settings/public → 200', pub.status === 200);
+  const pd = json(pub.body);
+  check('public settings has sound_enabled', Object.prototype.hasOwnProperty.call(pd ?? {}, 'sound_enabled'));
+  check('public settings has sfx_volume',    Object.prototype.hasOwnProperty.call(pd ?? {}, 'sfx_volume'));
+  check('public settings has music_volume',  Object.prototype.hasOwnProperty.call(pd ?? {}, 'music_volume'));
+  check('public settings has sfx_pack',      Object.prototype.hasOwnProperty.call(pd ?? {}, 'sfx_pack'));
+  check('public settings has bgm_lobby',     Object.prototype.hasOwnProperty.call(pd ?? {}, 'bgm_lobby'));
+  check('public settings has bgm_question',  Object.prototype.hasOwnProperty.call(pd ?? {}, 'bgm_question'));
+  check('sound_enabled default = "true"',    pd?.sound_enabled === 'true');
+  check('sfx_pack default = "classic"',      pd?.sfx_pack === 'classic');
+  check('bgm_lobby default = "lobby-chill"', pd?.bgm_lobby === 'lobby-chill');
+
+  // GET /host/api/settings (authenticated) also includes sound keys
+  const priv = await req({ path: '/host/api/settings', method: 'GET', headers: authHeaders() });
+  check('GET /host/api/settings → 200', priv.status === 200);
+  const hd = json(priv.body);
+  check('host settings has sound_enabled', Object.prototype.hasOwnProperty.call(hd ?? {}, 'sound_enabled'));
+  check('host settings has sfx_volume',    Object.prototype.hasOwnProperty.call(hd ?? {}, 'sfx_volume'));
+
+  // Valid audio settings save round-trip
+  const saveGood = await req(
+    { path: '/host/api/settings', method: 'PUT', headers: authHeaders() },
+    { sound_enabled: 'true', sfx_volume: '70', music_volume: '40',
+      sfx_pack: 'modern', bgm_lobby: 'lobby-upbeat', bgm_question: 'question-electronic' }
+  );
+  check('PUT valid audio settings → 200', saveGood.status === 200);
+
+  const verify = await req({ path: '/api/settings/public', method: 'GET' });
+  const vd = json(verify.body);
+  check('sfx_pack persisted as "modern"',  vd?.sfx_pack === 'modern');
+  check('bgm_lobby persisted as "lobby-upbeat"', vd?.bgm_lobby === 'lobby-upbeat');
+
+  // Restore defaults
+  await req({ path: '/host/api/settings', method: 'PUT', headers: authHeaders() },
+    { sound_enabled: 'true', sfx_volume: '80', music_volume: '50',
+      sfx_pack: 'classic', bgm_lobby: 'lobby-chill', bgm_question: 'question-action' });
+
+  // sfx_volume out of range → 400
+  const badVol = await req(
+    { path: '/host/api/settings', method: 'PUT', headers: authHeaders() },
+    { sfx_volume: '150' }
+  );
+  check('PUT sfx_volume=150 → 400', badVol.status === 400);
+
+  // sfx_pack invalid enum → 400
+  const badPack = await req(
+    { path: '/host/api/settings', method: 'PUT', headers: authHeaders() },
+    { sfx_pack: 'invalid' }
+  );
+  check('PUT sfx_pack="invalid" → 400', badPack.status === 400);
+
+  // bgm_lobby unknown track → 400
+  const badBgm = await req(
+    { path: '/host/api/settings', method: 'PUT', headers: authHeaders() },
+    { bgm_lobby: 'unknown-track' }
+  );
+  check('PUT bgm_lobby="unknown-track" → 400', badBgm.status === 400);
+
+  // music_volume negative → 400
+  const negVol = await req(
+    { path: '/host/api/settings', method: 'PUT', headers: authHeaders() },
+    { music_volume: '-5' }
+  );
+  check('PUT music_volume=-5 → 400', negVol.status === 400);
+}
+
+async function testLanguageSettings() {
+  // Default language is 'en' and appears in public endpoint
+  const pub = await req({ path: '/api/settings/public', method: 'GET' });
+  const pd = json(pub.body);
+  check('public settings has ui_language', Object.prototype.hasOwnProperty.call(pd ?? {}, 'ui_language'));
+  check('default ui_language is "en"', pd?.ui_language === 'en');
+
+  // Valid: switch to Spanish
+  const setEs = await req(
+    { path: '/host/api/settings', method: 'PUT', headers: authHeaders() },
+    { ui_language: 'es' }
+  );
+  check('PUT ui_language="es" → 200', setEs.status === 200);
+
+  const verifyEs = await req({ path: '/api/settings/public', method: 'GET' });
+  check('ui_language persisted as "es"', json(verifyEs.body)?.ui_language === 'es');
+
+  // Invalid: unknown language → 400
+  const badLang = await req(
+    { path: '/host/api/settings', method: 'PUT', headers: authHeaders() },
+    { ui_language: 'fr' }
+  );
+  check('PUT ui_language="fr" → 400', badLang.status === 400);
+
+  // Restore to English
+  await req({ path: '/host/api/settings', method: 'PUT', headers: authHeaders() },
+    { ui_language: 'en' });
+}
+
 (async () => {
   console.log('═══════════════════════════════════════════════════════════════');
   console.log('  ROMEU_QUIZ  REST Integration Tests');
@@ -425,6 +525,8 @@ async function testDeleteCleanup(quizId, dupQuizId) {
   try {
     await testHealth();
     await testAuth();
+    await testAudioSettings();
+    await testLanguageSettings();
     const quizId = await testQuizCRUD();
     if (!quizId) { console.error('\nCannot continue without a quiz ID — aborting'); process.exit(1); }
     await testMCQQuestions(quizId);
