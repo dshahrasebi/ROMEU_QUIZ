@@ -150,6 +150,52 @@ function registerHandlers(io, db, gameManager, sessionMiddleware) {
       _revealWithDelay(io, pin, gameManager);
     });
 
+    socket.on('host-kick', ({ pin, nickname } = {}) => {
+      if (!socket.request.session || !socket.request.session.isHost) {
+        return socket.emit('error', { message: t('sock.unauthorized') });
+      }
+      const state = gameManager.getState();
+      if (!state || state.pin !== pin) return;
+
+      const trimmedNick = (nickname ?? '').trim();
+      if (!trimmedNick) return;
+
+      // Find the player by nickname
+      let targetSocketId = null;
+      for (const [sid, p] of state.players.entries()) {
+        if (p.nickname.toLowerCase() === trimmedNick.toLowerCase()) {
+          targetSocketId = sid;
+          break;
+        }
+      }
+      if (!targetSocketId) return;
+
+      const player = state.players.get(targetSocketId);
+
+      // Track as kicked so they cannot rejoin
+      state.kickedNicknames.add(trimmedNick.toLowerCase());
+
+      // Remove from game state
+      state.players.delete(targetSocketId);
+
+      // Mark disconnected in DB
+      db.setPlayerConnected(player.playerId, false);
+
+      // Notify the kicked player's socket
+      const kickedSocket = io.sockets.sockets.get(targetSocketId);
+      if (kickedSocket) {
+        kickedSocket.emit('kicked', { message: t('sock.you_were_kicked') });
+        kickedSocket.leave(`session:${pin}`);
+        kickedSocket.disconnect(true);
+      }
+
+      // Update lobby for everyone
+      io.to(`session:${pin}`).emit('lobby-update', {
+        players: Array.from(state.players.values()).map(p => ({ nickname: p.nickname })),
+        playerCount: state.settings?.showPlayerCount !== false ? state.players.size : null,
+      });
+    });
+
     socket.on('host-end', ({ pin } = {}) => {
       if (!socket.request.session || !socket.request.session.isHost) {
         return socket.emit('error', { message: t('sock.unauthorized') });
@@ -221,6 +267,11 @@ function registerHandlers(io, db, gameManager, sessionMiddleware) {
       }
       if (state.settings?.profanityFilter && isProfane(trimmed)) {
         return socket.emit('join-error', { message: t('join.profanity') });
+      }
+
+      // Block kicked players from rejoining
+      if (gameManager.isKicked(trimmed)) {
+        return socket.emit('join-error', { message: t('sock.kicked_cannot_rejoin') });
       }
 
       // Look up existing player FIRST — reconnecting players must always be

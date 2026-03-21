@@ -17,6 +17,10 @@ const session   = require('express-session');
 const qrcode    = require('qrcode');
 const helmet    = require('helmet');
 const rateLimit = require('express-rate-limit');
+const fs        = require('fs');
+
+// Ensure data directory exists before opening SQLite
+fs.mkdirSync(process.env.DATA_PATH || '/data', { recursive: true });
 
 const db          = require('./src/db');
 const gameManager = require('./src/gameManager');

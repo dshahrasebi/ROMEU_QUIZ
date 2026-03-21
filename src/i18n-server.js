@@ -70,6 +70,8 @@ const MESSAGES = {
     'sock.cannot_reveal':         'Cannot reveal now',
     'sock.no_active':             'No active session',
     'sock.bad_advance':           'Cannot advance from status: {status}',
+    'sock.you_were_kicked':       'You were removed from the game',
+    'sock.kicked_cannot_rejoin':  'You were kicked and cannot rejoin',
   },
 
   es: {
@@ -133,6 +135,8 @@ const MESSAGES = {
     'sock.cannot_reveal':         'No se puede revelar ahora',
     'sock.no_active':             'No hay sesión activa',
     'sock.bad_advance':           'No se puede avanzar desde el estado: {status}',
+    'sock.you_were_kicked':       'Has sido eliminado del juego',
+    'sock.kicked_cannot_rejoin':  'Fuiste expulsado y no puedes volver a unirte',
   },
 };
 

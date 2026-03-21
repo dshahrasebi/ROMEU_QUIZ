@@ -1488,10 +1488,18 @@ function updatePlayerChips(players) {
   const el = document.getElementById('player-chips');
   document.getElementById('player-count').textContent = players.length;
   el.innerHTML = players.map(p => `
-    <span class="chip-pop bg-white/25 text-white text-sm font-bold px-3 py-1 rounded-full">
+    <span class="chip-pop bg-white/25 text-white text-sm font-bold px-3 py-1 rounded-full inline-flex items-center gap-1">
       ${esc(p.nickname)}
+      <button onclick="kickPlayer('${esc(p.nickname).replace(/'/g, "\\'")}')"
+        class="ml-1 text-white/40 hover:text-red-400 text-xs leading-none"
+        title="${t('host.btn_kick')}">&times;</button>
     </span>
   `).join('');
+}
+
+function kickPlayer(nickname) {
+  if (!activePin || !socket) return;
+  socket.emit('host-kick', { pin: activePin, nickname });
 }
 
 function renderLeaderboardSidebar(list) {

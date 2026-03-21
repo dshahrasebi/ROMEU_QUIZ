@@ -204,6 +204,12 @@
     </button>
   </div>
 
+  <!-- "Locked in!" overlay — shown after answer submitted -->
+  <div id="answer-locked-msg" class="hidden text-center mt-4">
+    <p class="text-2xl font-black" data-i18n="play.locked_in">✅ Locked in!</p>
+    <p class="text-white/50 text-sm mt-1" data-i18n="play.waiting_reveal">Waiting for reveal...</p>
+  </div>
+
   <!-- Bottom bar: score points above the depleting timer strip.
        Both in normal flow — no absolute positioning, no overlap. -->
   <div class="shrink-0 flex flex-col gap-2 px-4 pt-3"
@@ -232,6 +238,13 @@
   <h1 class="text-3xl font-black" data-i18n="play.thanks_playing">Thanks for playing!</h1>
   <p class="text-white/70 font-bold text-xl"><span data-i18n="play.final_score">Final score:</span> <span id="ended-score" class="text-white font-black">0</span></p>
   <p id="ended-rank" class="text-white/60 font-bold"></p>
+</div>
+
+<!-- ── Screen 7: Kicked ─────────────────────────────────────────────────── -->
+<div id="screen-kicked" class="screen flex-col items-center justify-center h-full p-6 gap-5 text-center">
+  <div class="text-6xl">🚫</div>
+  <h1 class="text-3xl font-black" data-i18n="play.kicked_title">Removed from game</h1>
+  <p class="text-white/70 font-bold text-lg" data-i18n="play.kicked_msg">You were removed by the host.</p>
 </div>
 
 <script>
@@ -491,6 +504,7 @@ function bindSocketEvents() {
 
     showScreen('screen-question');
     document.getElementById('feedback-waiting').classList.add('hidden');
+    document.getElementById('answer-locked-msg').classList.add('hidden');
     startTimerBar(data.timeLimitSeconds);
   });
 
@@ -527,10 +541,15 @@ function bindSocketEvents() {
       ? t('play.feedback_correct', { pts: myResult?.pointsEarned ?? 0 })
       : t('play.feedback_wrong');
 
-    // Streak bonus
+    // Streak count + bonus
     const streakEl = document.getElementById('feedback-streak');
-    if (myResult && myResult.bonusPoints > 0) {
-      streakEl.textContent = t('play.streak_bonus', { pts: myResult.bonusPoints });
+    const streak = myResult?.streak || 0;
+    if (streak >= 2) {
+      let streakText = t('play.streak_count', { count: streak });
+      if (myResult.bonusPoints > 0) {
+        streakText += ' ' + t('play.streak_bonus', { pts: myResult.bonusPoints });
+      }
+      streakEl.textContent = streakText;
       streakEl.classList.remove('hidden');
     } else {
       streakEl.classList.add('hidden');
@@ -577,6 +596,10 @@ function bindSocketEvents() {
     showScreen('screen-ended');
   });
 
+  socket.on('kicked', () => {
+    showScreen('screen-kicked');
+  });
+
   socket.on('disconnect', () => {
     socketReady = false;
     // Reconnect handled automatically by socket.io
@@ -592,6 +615,7 @@ document.querySelectorAll('.answer-tile').forEach(tile => {
     submittedOptionIndex = idx;
     tile.classList.add('selected'); // mark BEFORE lockTiles so CSS sees it immediately
     lockTiles();
+    document.getElementById('answer-locked-msg').classList.remove('hidden');
     socket.emit('submit-answer', { optionIndex: idx });
   });
 });

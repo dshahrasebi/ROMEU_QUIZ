@@ -116,6 +116,7 @@ async function startSession(quizId) {
     answers: new Map(),
     timer: null,
     settings,
+    kickedNicknames: new Set(),
   };
 
   _persist();
@@ -405,4 +406,7 @@ module.exports = {
   getCurrentQuestionForPlayer,
   restoreFromDb,
   scheduleAutoReveal,
+  isKicked(nickname) {
+    return state?.kickedNicknames?.has(nickname.toLowerCase()) ?? false;
+  },
 };
