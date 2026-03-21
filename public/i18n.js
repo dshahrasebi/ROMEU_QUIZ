@@ -237,6 +237,10 @@ window.I18N = {
     'host.network_error':       'Network error — try again',
     'host.pw_updated':          '✓ Password updated successfully',
     'host.settings_saved':      '✓ Settings saved',
+    'host.shuffle_questions_label': 'Shuffle question order',
+    'host.shuffle_questions_desc':  'Randomize question order each session',
+    'host.shuffle_options_label':   'Shuffle answer options',
+    'host.shuffle_options_desc':    'Each player sees options in a different order',
   },
 
   /* ════════════════════════════════════════════════════════════════════════ */
@@ -477,5 +481,9 @@ window.I18N = {
     'host.network_error':       'Error de red — inténtalo de nuevo',
     'host.pw_updated':          '✓ Contraseña actualizada correctamente',
     'host.settings_saved':      '✓ Configuración guardada',
+    'host.shuffle_questions_label': 'Aleatorizar orden de preguntas',
+    'host.shuffle_questions_desc':  'Cambiar el orden de preguntas en cada sesión',
+    'host.shuffle_options_label':   'Aleatorizar opciones de respuesta',
+    'host.shuffle_options_desc':    'Cada jugador ve las opciones en un orden diferente',
   }
 };

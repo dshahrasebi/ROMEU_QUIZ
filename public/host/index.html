@@ -185,8 +185,25 @@
             class="w-full rounded-xl px-4 py-3 text-gray-800 font-bold focus:outline-none focus:ring-2 focus:ring-white">
         </div>
       </div>
+      <!-- Shuffle options -->
+      <div class="space-y-3 pt-2 border-t border-white/10">
+        <label class="flex items-start gap-3 cursor-pointer">
+          <input type="checkbox" id="s-shuffle_questions" class="mt-1 w-5 h-5 accent-purple-500 rounded">
+          <div>
+            <span class="font-bold text-sm" data-i18n="host.shuffle_questions_label">Shuffle question order</span>
+            <p class="text-white/50 text-xs" data-i18n="host.shuffle_questions_desc">Randomize question order each session</p>
+          </div>
+        </label>
+        <label class="flex items-start gap-3 cursor-pointer">
+          <input type="checkbox" id="s-shuffle_options" class="mt-1 w-5 h-5 accent-purple-500 rounded">
+          <div>
+            <span class="font-bold text-sm" data-i18n="host.shuffle_options_label">Shuffle answer options</span>
+            <p class="text-white/50 text-xs" data-i18n="host.shuffle_options_desc">Each player sees options in a different order</p>
+          </div>
+        </label>
+      </div>
       <div id="s-msg-game" class="hidden rounded-xl px-4 py-3 text-sm font-bold"></div>
-      <button onclick="saveSettings('game',['default_time_limit','max_players','streak_bonus_3','streak_bonus_5'])"
+      <button onclick="saveSettings('game',['default_time_limit','max_players','streak_bonus_3','streak_bonus_5','shuffle_questions','shuffle_options'])"
         class="w-full bg-white text-purple-800 font-black text-lg rounded-xl py-3 hover:bg-purple-50 transition-colors shadow-lg"
         data-i18n="host.btn_save_game">
         Save Game Settings
@@ -768,7 +785,8 @@ async function loadSettingsPanel() {
     });
     // Checkboxes
     ['allow_late_joins','require_nickname_confirm','profanity_filter',
-     'show_answer_counts','show_player_count','sound_enabled'].forEach(key => {
+     'show_answer_counts','show_player_count','sound_enabled',
+     'shuffle_questions','shuffle_options'].forEach(key => {
       const el = document.getElementById(`s-${key}`);
       if (el) el.checked = s[key] === 'true';
     });
@@ -936,10 +954,15 @@ function renderQuestions(quizId, questions) {
   ];
 
   container.innerHTML = questions.map((q, i) => `
-    <div class="bg-white/10 rounded-xl p-4" id="question-row-${q.id}">
+    <div class="bg-white/10 rounded-xl p-4 draggable-question" id="question-row-${q.id}" draggable="true" data-question-id="${q.id}">
       <div class="question-view-${q.id}">
         <div class="flex items-start gap-2">
-          <span class="bg-white/20 rounded-full w-6 h-6 flex items-center justify-center text-xs font-black flex-shrink-0">${i+1}</span>
+          <div class="flex flex-col items-center gap-1 flex-shrink-0 mr-1">
+            <button onclick="moveQuestion(${quizId}, ${q.id}, -1)" class="text-white/30 hover:text-white text-xs leading-none ${i === 0 ? 'invisible' : ''}" title="Move up">▲</button>
+            <span class="cursor-grab text-white/30 hover:text-white text-sm drag-handle" title="Drag to reorder">⠿</span>
+            <button onclick="moveQuestion(${quizId}, ${q.id}, 1)" class="text-white/30 hover:text-white text-xs leading-none ${i === questions.length - 1 ? 'invisible' : ''}" title="Move down">▼</button>
+          </div>
+          <span class="bg-white/20 rounded-full w-6 h-6 flex items-center justify-center text-xs font-black flex-shrink-0 q-number">${i+1}</span>
           <div class="flex-1 min-w-0">
             <p class="font-bold text-sm">${esc(q.text)}</p>
             <p class="text-xs text-white/50 mt-1">⏱ ${q.time_limit_seconds}s &nbsp;·&nbsp; ✓ ${TILE_LABELS[q.correct_index].shape} ${esc(q.options[q.correct_index])}</p>
@@ -955,6 +978,68 @@ function renderQuestions(quizId, questions) {
       <div class="question-edit-form-${q.id} hidden"></div>
     </div>
   `).join('') + addBtn;
+
+  // ── Drag-and-drop reorder ──────────────────────────────────────────────
+  let dragSrcEl = null;
+  container.querySelectorAll('.draggable-question').forEach(row => {
+    row.addEventListener('dragstart', (e) => {
+      dragSrcEl = row;
+      row.style.opacity = '0.4';
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    row.addEventListener('dragend', () => {
+      row.style.opacity = '1';
+      container.querySelectorAll('.draggable-question').forEach(r => r.classList.remove('ring-2', 'ring-white/50'));
+    });
+    row.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      row.classList.add('ring-2', 'ring-white/50');
+    });
+    row.addEventListener('dragleave', () => {
+      row.classList.remove('ring-2', 'ring-white/50');
+    });
+    row.addEventListener('drop', async (e) => {
+      e.preventDefault();
+      row.classList.remove('ring-2', 'ring-white/50');
+      if (dragSrcEl === row) return;
+      // Reorder DOM
+      const allRows = [...container.querySelectorAll('.draggable-question')];
+      const fromIdx = allRows.indexOf(dragSrcEl);
+      const toIdx = allRows.indexOf(row);
+      if (fromIdx < toIdx) row.after(dragSrcEl);
+      else row.before(dragSrcEl);
+      // Update numbers & persist
+      await _persistQuestionOrder(quizId, container);
+    });
+  });
+}
+
+async function _persistQuestionOrder(quizId, container) {
+  const rows = [...container.querySelectorAll('.draggable-question')];
+  const questionIds = rows.map(r => Number(r.dataset.questionId));
+  rows.forEach((r, i) => {
+    const numEl = r.querySelector('.q-number');
+    if (numEl) numEl.textContent = i + 1;
+  });
+  try {
+    await apiFetch(`/host/api/quizzes/${quizId}/reorder`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ questionIds })
+    });
+  } catch (e) { console.error('Reorder failed:', e); }
+}
+
+async function moveQuestion(quizId, questionId, direction) {
+  const container = document.querySelector(`.question-list[data-quiz-id="${quizId}"]`);
+  const rows = [...container.querySelectorAll('.draggable-question')];
+  const idx = rows.findIndex(r => Number(r.dataset.questionId) === questionId);
+  const targetIdx = idx + direction;
+  if (targetIdx < 0 || targetIdx >= rows.length) return;
+  if (direction === -1) rows[targetIdx].before(rows[idx]);
+  else rows[targetIdx].after(rows[idx]);
+  await _persistQuestionOrder(quizId, container);
 }
 
 function _questionFormHTML(quizId, qData = null) {

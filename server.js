@@ -259,6 +259,9 @@ const SETTING_RULES = {
   sfx_pack:                     { type: 'enum',    values: ['classic','modern','punchy','off'] },
   bgm_lobby:                    { type: 'enum',    values: ['lobby-chill','lobby-upbeat','off'] },
   bgm_question:                 { type: 'enum',    values: ['question-action','question-electronic','off'] },
+  // ── Gameplay shuffle ────────────────────────────────────────────────
+  shuffle_questions:             { type: 'bool' },
+  shuffle_options:               { type: 'bool' },
   // ── Language ────────────────────────────────────────────────────────────────
   ui_language:                  { type: 'enum',    values: ['en','es'] },
 };
@@ -491,6 +494,20 @@ app.post('/host/api/quizzes/:id/duplicate', requireHost, (req, res) => {
       q.type || 'mcq', q.image_url || null, q.explanation || null);
   }
   return res.status(201).json({ ...newQuiz, question_count: quiz.questions.length });
+});
+
+app.put('/host/api/quizzes/:id/reorder', requireHost, (req, res) => {
+  const quizId = Number(req.params.id);
+  const quiz = db.getQuizById(quizId);
+  if (!quiz) return res.status(404).json({ error: t('err.quiz.not_found') });
+  const { questionIds } = req.body;
+  if (!Array.isArray(questionIds)) return res.status(400).json({ error: 'questionIds array required' });
+  const existing = new Set(quiz.questions.map(q => q.id));
+  if (questionIds.length !== existing.size || !questionIds.every(id => existing.has(id))) {
+    return res.status(400).json({ error: 'questionIds must contain all question IDs for this quiz' });
+  }
+  db.reorderQuestions(quizId, questionIds);
+  return res.json({ ok: true });
 });
 
 app.get('/host/api/sessions', requireHost, (_req, res) => {

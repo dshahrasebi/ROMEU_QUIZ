@@ -102,13 +102,24 @@ async function startSession(quizId) {
     showPlayerCount:            rawSettings.show_player_count !== 'false',
     profanityFilter:            rawSettings.profanity_filter === 'true',
     requireNicknameConfirm:     rawSettings.require_nickname_confirm === 'true',
+    shuffleQuestions:            rawSettings.shuffle_questions === 'true',
+    shuffleOptions:             rawSettings.shuffle_options === 'true',
   };
+
+  // Optionally shuffle question order
+  let questions = [...quiz.questions];
+  if (settings.shuffleQuestions) {
+    for (let i = questions.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [questions[i], questions[j]] = [questions[j], questions[i]];
+    }
+  }
 
   state = {
     sessionId: session.id,
     pin,
     quizId,
-    questions: quiz.questions,
+    questions,
     currentQuestionIndex: -1,
     status: 'lobby',
     players: new Map(),

@@ -69,17 +69,38 @@ function _emitLeaderboard(io, pin, gameManager) {
 function _startNextQuestion(io, pin, gameManager) {
   const s = gameManager.nextQuestion();
   const q = s.questions[s.currentQuestionIndex];
-  io.to(`session:${pin}`).emit('question-start', {
+  const basePayload = {
     questionIndex:  s.currentQuestionIndex,
     totalQuestions: s.questions.length,
     text:           q.text,
-    options:        q.options,
     timeLimitSeconds: q.time_limit_seconds,
     type:    q.type || 'mcq',
     imageUrl: q.image_url || null,
     questionOpenAt: s.questionOpenAt,
     players: Array.from(s.players.values()).filter(p => p.connected).map(p => p.nickname),
-  });
+  };
+
+  if (s.settings?.shuffleOptions) {
+    // Send unshuffled to host + display
+    io.to(`host:${pin}`).to(`display:${pin}`).emit('question-start', { ...basePayload, options: q.options });
+
+    // Send shuffled to each player individually
+    for (const [socketId, player] of s.players.entries()) {
+      if (!player.connected) continue;
+      const optCount = q.options.length;
+      const perm = Array.from({ length: optCount }, (_, i) => i);
+      for (let i = perm.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [perm[i], perm[j]] = [perm[j], perm[i]];
+      }
+      player._optionMap = perm; // perm[displayIndex] = originalIndex
+      const shuffledOptions = perm.map(i => q.options[i]);
+      io.to(socketId).emit('question-start', { ...basePayload, options: shuffledOptions });
+    }
+  } else {
+    io.to(`session:${pin}`).emit('question-start', { ...basePayload, options: q.options });
+  }
+
   gameManager.scheduleAutoReveal(q.time_limit_seconds * 1000, () => {
     const cur = gameManager.getState();
     if (!cur || cur.status !== 'question') return;
@@ -343,7 +364,16 @@ function registerHandlers(io, db, gameManager, sessionMiddleware) {
         return socket.emit('answer-locked', { message: t('join.answer_locked') });
       }
 
-      const result = gameManager.submitAnswer(socket.id, Number(optionIndex));
+      // Un-shuffle option index if shuffle_options is active
+      let actualIndex = Number(optionIndex);
+      if (state.settings?.shuffleOptions) {
+        const player = state.players.get(socket.id);
+        if (player && player._optionMap) {
+          actualIndex = player._optionMap[actualIndex] ?? actualIndex;
+        }
+      }
+
+      const result = gameManager.submitAnswer(socket.id, actualIndex);
       if (!result) return; // already answered or not in session
 
       socket.emit('answer-accepted', { optionIndex });
@@ -364,6 +394,11 @@ function registerHandlers(io, db, gameManager, sessionMiddleware) {
         totalAnswered: state.answers.size,
         totalPlayers: connectedCount,
         answeredNicknames,
+      });
+      // Broadcast count-only to all (display + players) — no nicknames for privacy
+      io.to(`session:${pin}`).emit('answer-count-update', {
+        totalAnswered: state.answers.size,
+        totalPlayers: connectedCount,
       });
 
       // Auto-reveal when all connected players answered

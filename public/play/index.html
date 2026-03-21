@@ -208,6 +208,7 @@
   <div id="answer-locked-msg" class="hidden text-center mt-4">
     <p class="text-2xl font-black" data-i18n="play.locked_in">✅ Locked in!</p>
     <p class="text-white/50 text-sm mt-1" data-i18n="play.waiting_reveal">Waiting for reveal...</p>
+    <p id="player-answer-count" class="text-white/40 text-xs mt-2"></p>
   </div>
 
   <!-- Bottom bar: score points above the depleting timer strip.
@@ -505,6 +506,7 @@ function bindSocketEvents() {
     showScreen('screen-question');
     document.getElementById('feedback-waiting').classList.add('hidden');
     document.getElementById('answer-locked-msg').classList.add('hidden');
+    document.getElementById('player-answer-count').textContent = '';
     startTimerBar(data.timeLimitSeconds);
   });
 
@@ -514,6 +516,11 @@ function bindSocketEvents() {
 
   socket.on('answer-locked', () => {
     lockTiles();
+  });
+
+  socket.on('answer-count-update', (data) => {
+    const el = document.getElementById('player-answer-count');
+    if (el) el.textContent = `${data.totalAnswered} / ${data.totalPlayers}`;
   });
 
   socket.on('question-reveal', (data) => {

@@ -258,6 +258,16 @@ const SETTING_DEFAULTS = {
   sfx_pack:                     'classic',
   bgm_lobby:                    'lobby-chill',
   bgm_question:                 'question-action',
+  // ── Gameplay shuffle ────────────────────────────────────────────────
+  shuffle_questions:             'false',
+  shuffle_options:               'false',
+};
+
+const reorderQuestions = (quizId, orderedIds) => {
+  const update = db.prepare('UPDATE questions SET sort_order = ? WHERE id = ? AND quiz_id = ?');
+  db.transaction(() => {
+    orderedIds.forEach((id, index) => update.run(index, id, quizId));
+  })();
 };
 
 const getAllSettings = () => {
@@ -298,6 +308,7 @@ module.exports = {
   // question
   addQuestion,
   updateQuestion,
+  reorderQuestions,
   getQuestionById: (id) => getQuestionById.get(id),
   deleteQuestion: (id) => deleteQuestion.run(id),
   // session

@@ -121,6 +121,11 @@ socket.on('question-start', (data) => {
   renderPhase(currentState);
 });
 
+socket.on('answer-count-update', (data) => {
+  const el = document.getElementById('answer-progress');
+  if (el) el.textContent = `${data.totalAnswered} / ${data.totalPlayers}`;
+});
+
 socket.on('question-reveal', (data) => {
   if (currentState) currentState.status = 'reveal';
   audio.stopMusic();
@@ -231,6 +236,8 @@ function renderQuestion(state) {
         <span class="bg-white/20 px-4 py-2 rounded-full font-black text-lg">
           ${t('disp.q_n_of_m', { n: (state.currentQuestionIndex ?? 0) + 1, m: state.totalQuestions || (state.questions?.length) || '?' })}
         </span>
+
+        <span id="answer-progress" class="bg-white/20 px-4 py-2 rounded-full font-bold text-lg">0 / ?</span>
 
         <!-- SVG countdown ring -->
         <div class="flex flex-col items-center gap-1">
