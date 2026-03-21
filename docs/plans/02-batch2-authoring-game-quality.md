@@ -1,4 +1,4 @@
-# Batch 2 — Authoring + Game Quality
+# Beatch 2 — Authoring + Game Quality
 
 ## 2.1 Drag-and-Drop Question Reorder
 

@@ -305,6 +305,16 @@ app.put('/host/api/settings', requireHost, (req, res) => {
   }
   if (Object.keys(errors).length) return res.status(400).json({ errors });
   db.setSettings(clean);
+
+  // Push language changes to connected clients in real-time
+  if (clean.ui_language) {
+    const ioRef = req.app.get('io');
+    const state = gameManager.getState();
+    if (ioRef && state) {
+      ioRef.to(`session:${state.pin}`).emit('settings-updated', { ui_language: clean.ui_language });
+    }
+  }
+
   return res.json({ ok: true, saved: Object.keys(clean) });
 });
 
@@ -345,7 +355,8 @@ app.post('/host/api/session/start', requireHost, async (req, res) => {
 
   try {
     const state   = await gameManager.startSession(Number(quizId));
-    const playUrl = `${process.env.BASE_URL}/play?pin=${state.pin}`;
+    const baseUrl = process.env.BASE_URL.startsWith('http') ? process.env.BASE_URL : `https://${process.env.BASE_URL}`;
+    const playUrl = `${baseUrl}/play?pin=${state.pin}`;
     const qrDataUrl = await qrcode.toDataURL(playUrl, { width: 320 });
 
     // Store qrDataUrl in the state (ephemeral — not needed in DB)

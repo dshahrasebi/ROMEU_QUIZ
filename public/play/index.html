@@ -523,6 +523,10 @@ function bindSocketEvents() {
     if (el) el.textContent = `${data.totalAnswered} / ${data.totalPlayers}`;
   });
 
+  socket.on('settings-updated', (data) => {
+    if (data.ui_language) window.applyI18n(data.ui_language);
+  });
+
   socket.on('question-reveal', (data) => {
     cancelTimerBar();
     const myResult = data.playerResults?.[savedNickname];

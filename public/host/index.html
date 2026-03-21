@@ -1538,11 +1538,13 @@ function _connectSocket() {
     document.getElementById('tally-bars').classList.add('hidden');
     document.getElementById('reveal-explanation').classList.add('hidden');
     document.getElementById('response-grid').style.display = 'none';
-    document.getElementById('response-placeholder').classList.remove('hidden');
+    document.getElementById('response-placeholder').classList.add('hidden');
     currentStatus = 'leaderboard';
     document.getElementById('phase-badge').textContent = t('host.phase_leaderboard');
     document.getElementById('btn-primary-action').textContent = t('host.btn_next_question');
     renderLeaderboardSidebar(data.leaderboard);
+    // Render full leaderboard in the main content area (projected to class)
+    _renderMainLeaderboard(data.leaderboard);
     // If leaderboard auto-advance is configured, show a countdown on the button
     if (data.leaderboardDurationSeconds > 0) {
       _startButtonCountdown(data.leaderboardDurationSeconds, t('host.btn_next_question'));
@@ -1557,6 +1559,7 @@ function _connectSocket() {
     document.getElementById('tally-bars').classList.add('hidden');
     document.getElementById('reveal-explanation').classList.add('hidden');
     document.getElementById('response-grid').style.display = 'none';
+    document.getElementById('response-placeholder').innerHTML = `<p class="text-white/30 font-bold text-sm text-center" data-i18n="host.live_responses">${t('host.live_responses')}</p>`;
     document.getElementById('response-placeholder').classList.remove('hidden');
     currentStatus = 'ended';
     document.getElementById('phase-badge').textContent = t('host.phase_ended');
@@ -1598,6 +1601,43 @@ function renderLeaderboardSidebar(list) {
         <span class="font-black text-sm">${p.score}</span>
       </div>
     `).join('');
+}
+
+function _renderMainLeaderboard(list) {
+  const el = document.getElementById('question-display');
+  if (!list || !list.length) {
+    el.innerHTML = `<p class="text-center text-white/40 font-bold text-xl">${t('disp.no_players')}</p>`;
+    return;
+  }
+  const medals = ['🥇', '🥈', '🥉'];
+  const maxScore = Math.max(...list.map(p => p.score), 1);
+  el.innerHTML = `
+    <div class="space-y-2">
+      <h2 class="text-2xl font-black text-center mb-4">🏆 ${t('host.leaderboard_label')}</h2>
+      ${list.map((p, i) => {
+        const rank = p.rank || i + 1;
+        const barW = Math.max(8, (p.score / maxScore) * 100);
+        const isTop3 = rank <= 3;
+        const medal = medals[rank - 1] || '';
+        const fontSize = isTop3 ? 'text-lg' : 'text-sm';
+        const bg = isTop3 ? 'bg-white/20' : 'bg-white/10';
+        return `
+          <div class="flex items-center gap-3 ${bg} rounded-xl px-4 py-2 stagger-slide" style="animation-delay:${i * 60}ms">
+            <span class="font-black w-8 text-right ${fontSize}">${medal || rank}</span>
+            <span class="flex-1 font-bold ${fontSize} truncate">${esc(p.nickname)}</span>
+            <div class="w-1/3 bg-white/10 rounded-full h-3 overflow-hidden">
+              <div class="h-full rounded-full transition-all duration-700" style="width:${barW}%;background:${isTop3 ? '#a78bfa' : 'rgba(255,255,255,0.4)'}"></div>
+            </div>
+            <span class="font-black ${fontSize} w-16 text-right">${p.score}</span>
+          </div>
+        `;
+      }).join('')}
+    </div>
+  `;
+  // Also show in the response area below
+  const placeholder = document.getElementById('response-placeholder');
+  placeholder.innerHTML = `<p class="text-white/30 font-bold text-sm text-center">${t('host.btn_next_question')} →</p>`;
+  placeholder.classList.remove('hidden');
 }
 
 function _renderPodium(podium) {
