@@ -56,11 +56,11 @@
     /* Tally bars: 4 across, flex-grow to fill space — tiles become near-square */
     #panel-game.widescreen #tally-bars { grid-template-columns: repeat(4, 1fr); grid-template-rows: 1fr; gap: 0.75rem; padding: 0.75rem; flex: 1; align-content: stretch; }
     #panel-game.widescreen #tally-bars > div { padding: clamp(0.75rem, 2vh, 2.5rem) clamp(0.75rem, 1.5vw, 1.5rem); display: flex; flex-direction: column; justify-content: center; min-height: 0; }
-    #panel-game.widescreen #tally-bars > div > .flex { margin-bottom: clamp(0.25rem, 0.8vh, 0.75rem); }
-    #panel-game.widescreen #tally-bars > div span:first-child { font-size: clamp(1.5rem, 3.5vh, 4rem); }
-    #panel-game.widescreen #tally-bars > div .flex-1 { font-size: clamp(1rem, 2vh, 2.25rem); font-weight: 800; }
-    #panel-game.widescreen #tally-bars > div .font-black { font-size: clamp(1rem, 2vh, 2.25rem); }
-    #panel-game.widescreen #tally-bars .bg-white\/20 { height: clamp(0.5rem, 1vh, 1.5rem); }
+    #panel-game.widescreen #tally-bars > div > .flex { margin-bottom: clamp(0.5rem, 1.5vh, 2rem); gap: clamp(0.5rem, 1.5vw, 1.5rem); }
+    #panel-game.widescreen #tally-bars > div span:first-child { font-size: clamp(2rem, 7vh, 8rem); }
+    #panel-game.widescreen #tally-bars > div .flex-1 { font-size: clamp(1.25rem, 4vh, 5rem); font-weight: 800; }
+    #panel-game.widescreen #tally-bars > div .font-black { font-size: clamp(1.25rem, 4vh, 5rem); }
+    #panel-game.widescreen #tally-bars .bg-white\/20 { height: clamp(0.5rem, 1.5vh, 2rem); }
 
     /* Response area: compact, never steals space */
     #panel-game.widescreen #response-area { flex: 0 0 auto; max-height: 10vh; padding: 0.5rem 1.25rem; }
