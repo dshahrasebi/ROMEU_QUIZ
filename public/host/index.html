@@ -45,25 +45,25 @@
     #panel-game.widescreen > .grid > .col-span-1 > div:nth-child(3) { flex: 1; overflow-y: auto; }
     #panel-game.widescreen #leaderboard-sidebar { max-height: 100%; overflow-y: auto; }
 
-    /* Question card: grows to fill remaining space, content vertically centered */
-    #panel-game.widescreen #question-card { flex: 1; padding: 1.5rem 2rem; overflow: hidden; }
-    #panel-game.widescreen #question-display { font-size: 1.5em; text-align: center; }
+    /* Question card: shares vertical space with tally bars */
+    #panel-game.widescreen #question-card { flex: 0.6; padding: 1.5rem 2rem; overflow: hidden; }
+    #panel-game.widescreen #question-display { font-size: clamp(1.25rem, 2.5vh, 2.5rem); text-align: center; }
 
-    /* Timer ring: properly sized, never squished */
-    #panel-game.widescreen #host-ring-wrap { width: 120px !important; height: 120px !important; flex-shrink: 0; }
-    #panel-game.widescreen #host-ring-timer { font-size: 2rem; }
+    /* Timer ring: scales with viewport, never squished */
+    #panel-game.widescreen #host-ring-wrap { width: clamp(80px, 10vh, 140px) !important; height: clamp(80px, 10vh, 140px) !important; flex-shrink: 0; }
+    #panel-game.widescreen #host-ring-timer { font-size: clamp(1.25rem, 2.5vh, 2.5rem); }
 
-    /* Tally bars: 4 across, large tiles for classroom TV */
-    #panel-game.widescreen #tally-bars { grid-template-columns: repeat(4, 1fr); gap: 0.75rem; padding: 0.75rem; }
-    #panel-game.widescreen #tally-bars > div { padding: 1.5rem 1.25rem; min-height: 120px; display: flex; flex-direction: column; justify-content: center; }
-    #panel-game.widescreen #tally-bars > div > .flex { margin-bottom: 0.5rem; }
-    #panel-game.widescreen #tally-bars > div span:first-child { font-size: 2.5rem; }
-    #panel-game.widescreen #tally-bars > div .flex-1 { font-size: 1.5rem; font-weight: 800; }
-    #panel-game.widescreen #tally-bars > div .font-black { font-size: 1.5rem; }
-    #panel-game.widescreen #tally-bars .bg-white\/20 { height: 1rem; }
+    /* Tally bars: 4 across, flex-grow to fill space — tiles become near-square */
+    #panel-game.widescreen #tally-bars { grid-template-columns: repeat(4, 1fr); grid-template-rows: 1fr; gap: 0.75rem; padding: 0.75rem; flex: 1; align-content: stretch; }
+    #panel-game.widescreen #tally-bars > div { padding: clamp(0.75rem, 2vh, 2.5rem) clamp(0.75rem, 1.5vw, 1.5rem); display: flex; flex-direction: column; justify-content: center; min-height: 0; }
+    #panel-game.widescreen #tally-bars > div > .flex { margin-bottom: clamp(0.25rem, 0.8vh, 0.75rem); }
+    #panel-game.widescreen #tally-bars > div span:first-child { font-size: clamp(1.5rem, 3.5vh, 4rem); }
+    #panel-game.widescreen #tally-bars > div .flex-1 { font-size: clamp(1rem, 2vh, 2.25rem); font-weight: 800; }
+    #panel-game.widescreen #tally-bars > div .font-black { font-size: clamp(1rem, 2vh, 2.25rem); }
+    #panel-game.widescreen #tally-bars .bg-white\/20 { height: clamp(0.5rem, 1vh, 1.5rem); }
 
-    /* Response area: compact, doesn't dominate */
-    #panel-game.widescreen #response-area { flex: 0 0 auto; max-height: 120px; min-height: 40px; padding: 0.5rem 1.25rem; }
+    /* Response area: compact, never steals space */
+    #panel-game.widescreen #response-area { flex: 0 0 auto; max-height: 10vh; padding: 0.5rem 1.25rem; }
 
     /* Action buttons: tighter */
     #panel-game.widescreen #action-area { gap: 0.5rem; }
