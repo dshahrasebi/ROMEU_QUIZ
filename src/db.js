@@ -261,6 +261,8 @@ const SETTING_DEFAULTS = {
   // ── Gameplay shuffle ────────────────────────────────────────────────
   shuffle_questions:             'false',
   shuffle_options:               'false',
+  // ── Display ────────────────────────────────────────────────────────────
+  display_mode:                  'standard',
 };
 
 const reorderQuestions = (quizId, orderedIds) => {

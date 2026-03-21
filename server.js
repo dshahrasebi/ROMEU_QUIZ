@@ -262,6 +262,8 @@ const SETTING_RULES = {
   // ── Gameplay shuffle ────────────────────────────────────────────────
   shuffle_questions:             { type: 'bool' },
   shuffle_options:               { type: 'bool' },
+  // ── Display ────────────────────────────────────────────────────────────────
+  display_mode:                  { type: 'enum',    values: ['standard','widescreen'] },
   // ── Language ────────────────────────────────────────────────────────────────
   ui_language:                  { type: 'enum',    values: ['en','es'] },
 };
@@ -306,12 +308,15 @@ app.put('/host/api/settings', requireHost, (req, res) => {
   if (Object.keys(errors).length) return res.status(400).json({ errors });
   db.setSettings(clean);
 
-  // Push language changes to connected clients in real-time
-  if (clean.ui_language) {
+  // Push language / display-mode changes to connected clients in real-time
+  if (clean.ui_language || clean.display_mode) {
     const ioRef = req.app.get('io');
     const state = gameManager.getState();
     if (ioRef && state) {
-      ioRef.to(`session:${state.pin}`).emit('settings-updated', { ui_language: clean.ui_language });
+      const payload = {};
+      if (clean.ui_language) payload.ui_language = clean.ui_language;
+      if (clean.display_mode) payload.display_mode = clean.display_mode;
+      ioRef.to(`session:${state.pin}`).emit('settings-updated', payload);
     }
   }
 
@@ -334,6 +339,7 @@ app.get('/api/settings/public', (_req, res) => {
     sfx_pack:                 all.sfx_pack,
     bgm_lobby:                all.bgm_lobby,
     bgm_question:             all.bgm_question,
+    display_mode:             all.display_mode,
   });
 });
 

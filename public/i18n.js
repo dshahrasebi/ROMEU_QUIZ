@@ -89,6 +89,7 @@ window.I18N = {
     'host.stab_session':        '⏱ Session',
     'host.stab_security':       '🔒 Security',
     'host.stab_audio':          '🔊 Audio',
+    'host.stab_display':         '🖥 Display',
     'host.stab_language':       '🌐 Language',
 
     /* ── Host – General (Branding) ────────────────────────────────────── */
@@ -241,6 +242,15 @@ window.I18N = {
     'host.shuffle_questions_desc':  'Randomize question order each session',
     'host.shuffle_options_label':   'Shuffle answer options',
     'host.shuffle_options_desc':    'Each player sees options in a different order',
+
+    /* ── Host – Display ─────────────────────────────────────────────────────── */
+    'host.display_heading':          '🖥 Display Mode',
+    'host.display_note':             'Choose how the game panel is laid out on your projector or TV.',
+    'host.display_standard':         'Standard',
+    'host.display_standard_desc':    'Centered layout with max width — good for monitors and smaller screens.',
+    'host.display_widescreen':       'Widescreen (16:9 TV)',
+    'host.display_widescreen_desc':  'Full-width layout optimized for large 16:9 TVs and projectors.',
+    'host.btn_save_display':         'Save Display Settings',
   },
 
   /* ════════════════════════════════════════════════════════════════════════ */
@@ -333,6 +343,7 @@ window.I18N = {
     'host.stab_session':        '⏱ Sesión',
     'host.stab_security':       '🔒 Seguridad',
     'host.stab_audio':          '🔊 Audio',
+    'host.stab_display':         '🖥 Pantalla',
     'host.stab_language':       '🌐 Idioma',
 
     /* ── Host – General (Branding) ────────────────────────────────────── */
@@ -485,5 +496,14 @@ window.I18N = {
     'host.shuffle_questions_desc':  'Cambiar el orden de preguntas en cada sesión',
     'host.shuffle_options_label':   'Aleatorizar opciones de respuesta',
     'host.shuffle_options_desc':    'Cada jugador ve las opciones en un orden diferente',
+
+    /* ── Host – Display ─────────────────────────────────────────────────────── */
+    'host.display_heading':          '🖥 Modo de pantalla',
+    'host.display_note':             'Elige cómo se muestra el panel del juego en tu proyector o TV.',
+    'host.display_standard':         'Estándar',
+    'host.display_standard_desc':    'Diseño centrado con ancho máximo — ideal para monitores y pantallas pequeñas.',
+    'host.display_widescreen':       'Pantalla ancha (TV 16:9)',
+    'host.display_widescreen_desc':  'Diseño a ancho completo optimizado para TVs y proyectores 16:9.',
+    'host.btn_save_display':         'Guardar config. de pantalla',
   }
 };
