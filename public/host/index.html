@@ -31,15 +31,38 @@
     .stab-active { background: white !important; color: #5b21b6 !important; }
 
     /* ── Widescreen mode (16:9 TV) ──────────────────────────────────── */
-    #panel-game.widescreen { max-width: none; padding: 1rem 2rem; }
-    #panel-game.widescreen > .grid { grid-template-columns: 240px 1fr; }
-    #panel-game.widescreen #tally-bars { grid-template-columns: repeat(4, 1fr); }
-    #panel-game.widescreen #question-display { font-size: 1.25em; }
-    #panel-game.widescreen #game-pin { font-size: 2.5rem; }
-    #panel-game.widescreen #qr-img { width: 6rem; height: 6rem; }
-    #panel-game.widescreen #host-ring-wrap { width: 112px; height: 112px; }
-    #panel-game.widescreen #host-ring-wrap svg { width: 112px; height: 112px; }
-    #panel-game.widescreen #host-ring-timer { font-size: 1.5rem; }
+    #panel-game.widescreen { max-width: none; padding: 0.75rem 1.5rem; }
+    #panel-game.widescreen > .grid { grid-template-columns: 280px 1fr; gap: 0.75rem; }
+    #panel-game.widescreen > .grid > .col-span-2 { grid-column: span 1; gap: 0.75rem; }
+
+    /* Sidebar: compact PIN, leaderboard grows */
+    #panel-game.widescreen > .grid > .col-span-1 { gap: 0.5rem; }
+    #panel-game.widescreen #game-pin { font-size: 2rem; padding-top: 0; padding-bottom: 0; }
+    #panel-game.widescreen #qr-img { width: 5rem; height: 5rem; margin-top: 0.25rem; }
+    /* Players card: don't grow */
+    #panel-game.widescreen > .grid > .col-span-1 > div:nth-child(2) { flex: 0 0 auto; }
+    /* Leaderboard card: fill remaining sidebar space */
+    #panel-game.widescreen > .grid > .col-span-1 > div:nth-child(3) { flex: 1; overflow-y: auto; }
+    #panel-game.widescreen #leaderboard-sidebar { max-height: 100%; overflow-y: auto; }
+
+    /* Question card: hero element, grows to fill */
+    #panel-game.widescreen #question-card { flex: 1; padding: 1.5rem 2rem; align-items: center; }
+    #panel-game.widescreen #question-display { font-size: 1.5em; }
+
+    /* Timer ring: properly sized + centered */
+    #panel-game.widescreen #host-ring-wrap { width: 120px !important; height: 120px !important; }
+    #panel-game.widescreen #host-ring-timer { font-size: 2rem; }
+
+    /* Tally bars: 4 across */
+    #panel-game.widescreen #tally-bars { grid-template-columns: repeat(4, 1fr); gap: 0.5rem; padding: 0.75rem; }
+    #panel-game.widescreen #tally-bars > div { padding: 0.75rem 1rem; }
+
+    /* Response area: compact, doesn't dominate */
+    #panel-game.widescreen #response-area { flex: 0 0 auto; max-height: 160px; min-height: 60px; padding: 0.75rem 1.25rem; }
+
+    /* Action buttons: tighter */
+    #panel-game.widescreen #action-area { gap: 0.5rem; }
+    #panel-game.widescreen #btn-primary-action { padding-top: 0.75rem; padding-bottom: 0.75rem; font-size: 1.125rem; }
   </style>
 </head>
 <body class="gradient-bg min-h-screen">
@@ -529,8 +552,8 @@
     <!-- Center: main stage -->
     <div class="col-span-2 flex flex-col gap-4">
 
-      <!-- Top card: question text + timer ring (height matches PIN card) -->
-      <div class="bg-white/10 backdrop-blur rounded-2xl p-5 flex items-center gap-5">
+      <!-- Top card: question text + timer ring -->
+      <div id="question-card" class="bg-white/10 backdrop-blur rounded-2xl p-5 flex items-center gap-5">
         <div class="flex-1 min-w-0 flex flex-col gap-3">
           <div class="flex items-center gap-3">
             <span id="phase-badge" class="bg-white/20 px-3 py-1 rounded-full text-sm font-bold uppercase tracking-wide">Lobby</span>
@@ -542,7 +565,7 @@
         </div>
         <!-- Circular countdown ring -->
         <div id="host-ring-wrap" class="hidden shrink-0" style="position:relative;width:96px;height:96px">
-          <svg viewBox="0 0 120 120" width="96" height="96" style="display:block">
+          <svg viewBox="0 0 120 120" width="100%" height="100%" style="display:block">
             <circle cx="60" cy="60" r="54" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="10"/>
             <circle id="host-ring-circle" cx="60" cy="60" r="54"
               fill="none" stroke="#fff" stroke-width="10"
@@ -595,8 +618,8 @@
       <!-- Explanation (shown after reveal) -->
       <div id="reveal-explanation" class="hidden bg-white/15 backdrop-blur rounded-2xl px-5 py-3 text-white font-bold text-sm text-center"></div>
 
-      <!-- Live participation grid (flex-1) -->
-      <div class="bg-white/10 backdrop-blur rounded-2xl p-5 flex-1 flex flex-col min-h-0 gap-3">
+      <!-- Live participation grid -->
+      <div id="response-area" class="bg-white/10 backdrop-blur rounded-2xl p-5 flex-1 flex flex-col min-h-0 gap-3">
         <div id="response-placeholder" class="flex-1 flex items-center justify-center">
           <p class="text-white/30 font-bold text-sm text-center" data-i18n="host.live_responses">Live responses appear here during questions</p>
         </div>
