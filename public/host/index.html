@@ -45,24 +45,26 @@
     #panel-game.widescreen > .grid > .col-span-1 > div:nth-child(3) { flex: 1; overflow-y: auto; }
     #panel-game.widescreen #leaderboard-sidebar { max-height: 100%; overflow-y: auto; }
 
-    /* Question card: hero element, grows to fill */
-    #panel-game.widescreen #question-card { flex: 1; padding: 1.5rem 2rem; align-items: center; }
+    /* Question card: centered in remaining space above tally bars */
+    #panel-game.widescreen #question-card { flex: 1; padding: 1.5rem 2rem; align-items: center; justify-content: center; }
+    #panel-game.widescreen #question-card > .flex-1 { flex: none; width: 100%; text-align: center; }
     #panel-game.widescreen #question-display { font-size: 1.5em; }
 
     /* Timer ring: properly sized + centered */
     #panel-game.widescreen #host-ring-wrap { width: 120px !important; height: 120px !important; }
     #panel-game.widescreen #host-ring-timer { font-size: 2rem; }
 
-    /* Tally bars: 4 across, large for classroom TV */
+    /* Tally bars: 4 across, tall tiles for classroom TV */
     #panel-game.widescreen #tally-bars { grid-template-columns: repeat(4, 1fr); gap: 0.75rem; padding: 1rem; }
-    #panel-game.widescreen #tally-bars > div { padding: 1.25rem 1.5rem; }
-    #panel-game.widescreen #tally-bars > div span:first-child { font-size: 2.5rem; }
-    #panel-game.widescreen #tally-bars > div .flex-1 { font-size: 1.5rem; font-weight: 800; }
-    #panel-game.widescreen #tally-bars > div .font-black { font-size: 1.5rem; }
-    #panel-game.widescreen #tally-bars .bg-white\/20 { height: 1rem; }
+    #panel-game.widescreen #tally-bars > div { padding: 2rem 1.5rem; min-height: 160px; display: flex; flex-direction: column; justify-content: center; }
+    #panel-game.widescreen #tally-bars > div > .flex { margin-bottom: 0.75rem; }
+    #panel-game.widescreen #tally-bars > div span:first-child { font-size: 3rem; }
+    #panel-game.widescreen #tally-bars > div .flex-1 { font-size: 1.75rem; font-weight: 800; }
+    #panel-game.widescreen #tally-bars > div .font-black { font-size: 1.75rem; }
+    #panel-game.widescreen #tally-bars .bg-white\/20 { height: 1.25rem; }
 
     /* Response area: compact, doesn't dominate */
-    #panel-game.widescreen #response-area { flex: 0 0 auto; max-height: 160px; min-height: 60px; padding: 0.75rem 1.25rem; }
+    #panel-game.widescreen #response-area { flex: 0 0 auto; max-height: 120px; min-height: 40px; padding: 0.5rem 1.25rem; }
 
     /* Action buttons: tighter */
     #panel-game.widescreen #action-area { gap: 0.5rem; }
