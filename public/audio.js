@@ -244,7 +244,10 @@ class AudioManager {
 
       // Use cached buffer if available
       if (!this._bgmBufferCache[trackId]) {
-        const resp = await fetch(`/audio/bgm/${trackId}.wav`);
+        const url = trackId.startsWith('custom:')
+          ? `/uploads/audio/${trackId.slice(7)}`
+          : `/audio/bgm/${trackId}.wav`;
+        const resp = await fetch(url);
         if (!resp.ok) return; // missing file — silent fail
         const arrayBuf = await resp.arrayBuffer();
         this._bgmBufferCache[trackId] = await ctx.decodeAudioData(arrayBuf);

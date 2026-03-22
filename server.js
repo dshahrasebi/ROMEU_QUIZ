@@ -18,9 +18,12 @@ const qrcode    = require('qrcode');
 const helmet    = require('helmet');
 const rateLimit = require('express-rate-limit');
 const fs        = require('fs');
+const multer    = require('multer');
 
 // Ensure data directory exists before opening SQLite
-fs.mkdirSync(process.env.DATA_PATH || '/data', { recursive: true });
+const DATA_PATH = process.env.DATA_PATH || '/data';
+fs.mkdirSync(DATA_PATH, { recursive: true });
+fs.mkdirSync(path.join(DATA_PATH, 'audio'), { recursive: true });
 
 const db          = require('./src/db');
 const gameManager = require('./src/gameManager');
@@ -114,6 +117,7 @@ app.use('/play',       express.static(path.join(__dirname, 'public/play'), stati
 app.use('/shared.css', express.static(path.join(__dirname, 'public/shared.css'), staticOpts));
 app.use('/audio.js',   express.static(path.join(__dirname, 'public/audio.js'), staticOpts));
 app.use('/audio',      express.static(path.join(__dirname, 'public/audio'), staticOpts));
+app.use('/uploads/audio', express.static(path.join(DATA_PATH, 'audio'), staticOpts));
 app.use('/i18n.js',    express.static(path.join(__dirname, 'public/i18n.js'), staticOpts));
 app.use('/lang.js',    express.static(path.join(__dirname, 'public/lang.js'), staticOpts));
 
@@ -257,8 +261,8 @@ const SETTING_RULES = {
   sfx_volume:                   { type: 'int',     min: 0,   max: 100 },
   music_volume:                 { type: 'int',     min: 0,   max: 100 },
   sfx_pack:                     { type: 'enum',    values: ['classic','modern','punchy','off'] },
-  bgm_lobby:                    { type: 'enum',    values: ['lobby-chill','lobby-upbeat','off'] },
-  bgm_question:                 { type: 'enum',    values: ['question-action','question-electronic','off'] },
+  bgm_lobby:                    { type: 'bgm_track', builtIn: ['lobby-chill','lobby-upbeat','off'] },
+  bgm_question:                  { type: 'bgm_track', builtIn: ['question-action','question-electronic','off'] },
   // ── Gameplay shuffle ────────────────────────────────────────────────
   shuffle_questions:             { type: 'bool' },
   shuffle_options:               { type: 'bool' },
@@ -287,6 +291,14 @@ function validateSettingValue(key, value) {
   } else if (rule.type === 'url_or_empty') {
     const s = String(value ?? '').trim();
     if (s && !/^https?:\/\//i.test(s)) return t('err.settings.url', { key });
+  } else if (rule.type === 'bgm_track') {
+    if (rule.builtIn.includes(value)) return null;
+    if (/^custom:[\w.-]+$/.test(value)) {
+      const filename = value.slice(7);
+      if (!db.getCustomAudioByFilename(filename)) return `Unknown custom audio: ${filename}`;
+      return null;
+    }
+    return t('err.settings.enum', { key, values: rule.builtIn.join(', ') + ', custom:...' });
   }
   return null; // valid
 }
@@ -321,6 +333,52 @@ app.put('/host/api/settings', requireHost, (req, res) => {
   }
 
   return res.json({ ok: true, saved: Object.keys(clean) });
+});
+
+// ── Custom Audio Upload API ───────────────────────────────────────────────────
+const audioUpload = multer({
+  dest: path.join(DATA_PATH, 'audio'),
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB
+  fileFilter: (_req, file, cb) => {
+    if (file.mimetype === 'audio/mpeg' || file.originalname.toLowerCase().endsWith('.mp3')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only .mp3 files are allowed'));
+    }
+  },
+});
+
+app.post('/host/api/audio/upload', requireHost, (req, res, next) => {
+  audioUpload.single('audio')(req, res, (err) => {
+    if (err) return res.status(400).json({ error: err.message });
+    if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+    const category = req.body.category;
+    if (!['lobby', 'question'].includes(category)) {
+      fs.unlinkSync(req.file.path);
+      return res.status(400).json({ error: 'category must be lobby or question' });
+    }
+    // Rename to add .mp3 extension
+    const filename = req.file.filename + '.mp3';
+    const newPath = req.file.path + '.mp3';
+    fs.renameSync(req.file.path, newPath);
+    const row = db.addCustomAudio(filename, req.file.originalname, category);
+    return res.json(row);
+  });
+});
+
+app.get('/host/api/audio/list', requireHost, (_req, res) => {
+  return res.json(db.getAllCustomAudio());
+});
+
+app.delete('/host/api/audio/:id', requireHost, (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) return res.status(400).json({ error: 'Invalid id' });
+  const row = db.getCustomAudioById(id);
+  if (!row) return res.status(404).json({ error: 'Not found' });
+  const filePath = path.join(DATA_PATH, 'audio', row.filename);
+  try { fs.unlinkSync(filePath); } catch {}
+  db.deleteCustomAudio(id);
+  return res.json({ ok: true });
 });
 
 // ── Public branding endpoint (no auth — for display/play screens) ─────────────

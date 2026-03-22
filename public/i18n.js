@@ -171,6 +171,10 @@ window.I18N = {
     'host.bgm_action':         'Action (driving, intense)',
     'host.bgm_electronic':     'Electronic (pulsing)',
     'host.btn_save_audio':     'Save Audio Settings',
+    'host.custom_audio_title':  '🎵 Custom Audio Tracks',
+    'host.custom_audio_desc':   'Upload .mp3 files (max 5 MB) to use as lobby or question music.',
+    'host.btn_choose_file':     'Choose .mp3 file…',
+    'host.btn_upload':          'Upload',
     'host.audio_info':         'ℹ️  Game audio plays on the display screen (/display?pin=…). Open that page on your projector/TV, then click or press a key on it once to unlock browser audio.',
     'host.btn_test_sound':     '🔔 Test Sound in This Browser',
 
@@ -425,6 +429,10 @@ window.I18N = {
     'host.bgm_action':         'Acción (intenso)',
     'host.bgm_electronic':     'Electrónico (pulsante)',
     'host.btn_save_audio':     'Guardar config. de audio',
+    'host.custom_audio_title':  '🎵 Pistas de audio personalizadas',
+    'host.custom_audio_desc':   'Sube archivos .mp3 (máx. 5 MB) para usarlos como música de lobby o de pregunta.',
+    'host.btn_choose_file':     'Elegir archivo .mp3…',
+    'host.btn_upload':          'Subir',
     'host.audio_info':         'ℹ️  El audio del juego se reproduce en la pantalla de presentación (/display?pin=…). Ábrela en el proyector y haz clic o pulsa una tecla para activar el audio del navegador.',
     'host.btn_test_sound':     '🔔 Probar sonido en este navegador',
 

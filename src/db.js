@@ -70,6 +70,14 @@ db.exec(`
     key   TEXT PRIMARY KEY,
     value TEXT NOT NULL
   );
+
+  CREATE TABLE IF NOT EXISTS custom_audio (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    filename      TEXT    NOT NULL UNIQUE,
+    original_name TEXT    NOT NULL,
+    category      TEXT    NOT NULL CHECK(category IN ('lobby','question')),
+    uploaded_at   TEXT    NOT NULL DEFAULT (datetime('now'))
+  );
 `);
 
 // ── Schema migrations (idempotent) ───────────────────────────────────────────────────
@@ -342,4 +350,15 @@ module.exports = {
   },
   getAllSettings,
   setSettings,
+  // custom audio
+  addCustomAudio: (filename, originalName, category) =>
+    db.prepare('INSERT INTO custom_audio (filename, original_name, category) VALUES (?, ?, ?) RETURNING *').get(filename, originalName, category),
+  getAllCustomAudio: () =>
+    db.prepare('SELECT * FROM custom_audio ORDER BY uploaded_at DESC').all(),
+  getCustomAudioById: (id) =>
+    db.prepare('SELECT * FROM custom_audio WHERE id = ?').get(id),
+  getCustomAudioByFilename: (filename) =>
+    db.prepare('SELECT * FROM custom_audio WHERE filename = ?').get(filename),
+  deleteCustomAudio: (id) =>
+    db.prepare('DELETE FROM custom_audio WHERE id = ?').run(id),
 };

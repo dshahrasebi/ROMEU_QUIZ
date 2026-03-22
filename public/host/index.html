@@ -410,35 +410,66 @@
       <!-- SFX pack -->
       <div>
         <label class="block text-sm font-bold text-white/70 mb-1">SFX Style</label>
-        <select id="s-sfx_pack"
-          class="w-full rounded-xl px-4 py-3 text-gray-800 font-bold focus:outline-none focus:ring-2 focus:ring-white">
-          <option value="classic">Classic (8-bit square wave)</option>
-          <option value="modern">Modern (smooth sine)</option>
-          <option value="punchy">Punchy (sawtooth)</option>
-          <option value="off">Off (no SFX)</option>
-        </select>
+        <div class="flex gap-2">
+          <select id="s-sfx_pack"
+            class="flex-1 rounded-xl px-4 py-3 text-gray-800 font-bold focus:outline-none focus:ring-2 focus:ring-white">
+            <option value="classic">Classic (8-bit square wave)</option>
+            <option value="modern">Modern (smooth sine)</option>
+            <option value="punchy">Punchy (sawtooth)</option>
+            <option value="off">Off (no SFX)</option>
+          </select>
+          <button onclick="testSfxPreview()" class="bg-white/20 hover:bg-white/35 text-white font-bold px-4 py-2 rounded-xl transition-colors text-sm shrink-0" title="Test SFX">▶</button>
+        </div>
       </div>
 
       <!-- Lobby BGM -->
       <div>
         <label class="block text-sm font-bold text-white/70 mb-1">Lobby Music</label>
-        <select id="s-bgm_lobby"
-          class="w-full rounded-xl px-4 py-3 text-gray-800 font-bold focus:outline-none focus:ring-2 focus:ring-white">
-          <option value="lobby-chill">Chill (slow arpeggios)</option>
-          <option value="lobby-upbeat">Upbeat (energetic)</option>
-          <option value="off">Off</option>
-        </select>
+        <div class="flex gap-2">
+          <select id="s-bgm_lobby"
+            class="flex-1 rounded-xl px-4 py-3 text-gray-800 font-bold focus:outline-none focus:ring-2 focus:ring-white">
+            <option value="lobby-chill">Chill (slow arpeggios)</option>
+            <option value="lobby-upbeat">Upbeat (energetic)</option>
+            <option value="off">Off</option>
+          </select>
+          <button onclick="testBgmPreview('s-bgm_lobby')" class="bg-white/20 hover:bg-white/35 text-white font-bold px-4 py-2 rounded-xl transition-colors text-sm shrink-0" title="Test BGM">▶</button>
+        </div>
       </div>
 
       <!-- Question BGM -->
       <div>
         <label class="block text-sm font-bold text-white/70 mb-1">Question Music</label>
-        <select id="s-bgm_question"
-          class="w-full rounded-xl px-4 py-3 text-gray-800 font-bold focus:outline-none focus:ring-2 focus:ring-white">
-          <option value="question-action">Action (driving, intense)</option>
-          <option value="question-electronic">Electronic (pulsing)</option>
-          <option value="off">Off</option>
-        </select>
+        <div class="flex gap-2">
+          <select id="s-bgm_question"
+            class="flex-1 rounded-xl px-4 py-3 text-gray-800 font-bold focus:outline-none focus:ring-2 focus:ring-white">
+            <option value="question-action">Action (driving, intense)</option>
+            <option value="question-electronic">Electronic (pulsing)</option>
+            <option value="off">Off</option>
+          </select>
+          <button onclick="testBgmPreview('s-bgm_question')" class="bg-white/20 hover:bg-white/35 text-white font-bold px-4 py-2 rounded-xl transition-colors text-sm shrink-0" title="Test BGM">▶</button>
+        </div>
+      </div>
+
+      <!-- Custom Audio Upload -->
+      <div class="border-t border-white/15 pt-5 space-y-3">
+        <h3 class="text-sm font-black text-white/80" data-i18n="host.custom_audio_title">🎵 Custom Audio Tracks</h3>
+        <p class="text-xs text-white/50" data-i18n="host.custom_audio_desc">Upload .mp3 files (max 5 MB) to use as lobby or question music.</p>
+        <div class="flex gap-2 items-end">
+          <div class="flex-1">
+            <input type="file" id="audio-file-input" accept=".mp3,audio/mpeg" class="hidden">
+            <button onclick="document.getElementById('audio-file-input').click()"
+              class="w-full bg-white/15 hover:bg-white/25 text-white font-bold px-4 py-2.5 rounded-xl transition-colors text-sm text-left truncate"
+              id="audio-file-label" data-i18n="host.btn_choose_file">Choose .mp3 file…</button>
+          </div>
+          <select id="audio-upload-category" class="rounded-xl px-3 py-2.5 text-gray-800 font-bold text-sm">
+            <option value="lobby">Lobby</option>
+            <option value="question">Question</option>
+          </select>
+          <button onclick="uploadCustomAudio()"
+            class="bg-purple-500 hover:bg-purple-400 text-white font-bold px-4 py-2.5 rounded-xl transition-colors text-sm shrink-0"
+            data-i18n="host.btn_upload">Upload</button>
+        </div>
+        <div id="custom-audio-list" class="space-y-2"></div>
       </div>
 
       <div id="s-msg-audio" class="hidden rounded-xl px-4 py-3 text-sm font-bold"></div>
@@ -816,6 +847,105 @@ function testHostAudio() {
   }
 }
 
+// ── BGM / SFX preview functions ─────────────────────────────────────────────
+let _previewAudio = null;
+function testBgmPreview(selectId) {
+  // Stop any existing preview
+  if (_previewAudio) { try { _previewAudio.pause(); _previewAudio = null; } catch {} }
+  const trackId = document.getElementById(selectId).value;
+  if (trackId === 'off') return;
+  const url = trackId.startsWith('custom:')
+    ? `/uploads/audio/${trackId.slice(7)}`
+    : `/audio/bgm/${trackId}.wav`;
+  _previewAudio = new Audio(url);
+  _previewAudio.volume = 0.5;
+  _previewAudio.play().catch(() => {});
+  setTimeout(() => { if (_previewAudio) { _previewAudio.pause(); _previewAudio = null; } }, 5000);
+}
+function testSfxPreview() {
+  testHostAudio(); // reuse the existing SFX test
+}
+
+// ── Custom audio upload ─────────────────────────────────────────────────────
+document.getElementById('audio-file-input')?.addEventListener('change', (e) => {
+  const name = e.target.files[0]?.name || t('host.btn_choose_file');
+  document.getElementById('audio-file-label').textContent = name;
+});
+
+async function uploadCustomAudio() {
+  const fileInput = document.getElementById('audio-file-input');
+  if (!fileInput.files.length) return;
+  const category = document.getElementById('audio-upload-category').value;
+  const fd = new FormData();
+  fd.append('audio', fileInput.files[0]);
+  fd.append('category', category);
+  try {
+    const resp = await apiFetch('/host/api/audio/upload', { method: 'POST', body: fd, raw: true });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error || 'Upload failed');
+    fileInput.value = '';
+    document.getElementById('audio-file-label').textContent = t('host.btn_choose_file');
+    loadCustomAudioList();
+  } catch (e) { alert(e.message); }
+}
+
+async function deleteCustomAudio(id) {
+  if (!confirm('Delete this audio track?')) return;
+  try {
+    await apiFetch(`/host/api/audio/${id}`, { method: 'DELETE' });
+    loadCustomAudioList();
+  } catch {}
+}
+
+async function loadCustomAudioList() {
+  try {
+    const resp = await apiFetch('/host/api/audio/list');
+    const list = await resp.json();
+    const container = document.getElementById('custom-audio-list');
+    // Update dropdown options
+    const lobbySelect = document.getElementById('s-bgm_lobby');
+    const questionSelect = document.getElementById('s-bgm_question');
+    // Remove old custom options
+    lobbySelect.querySelectorAll('option[data-custom]').forEach(o => o.remove());
+    questionSelect.querySelectorAll('option[data-custom]').forEach(o => o.remove());
+    // Add custom options before "Off"
+    list.forEach(item => {
+      const opt = document.createElement('option');
+      opt.value = `custom:${item.filename}`;
+      opt.textContent = `🎵 ${item.original_name}`;
+      opt.dataset.custom = '1';
+      const sel = item.category === 'lobby' ? lobbySelect : questionSelect;
+      const offOpt = sel.querySelector('option[value="off"]');
+      sel.insertBefore(opt, offOpt);
+    });
+    // Re-apply current setting values
+    const settings = await apiFetch('/host/api/settings').then(r => r.json());
+    if (settings.bgm_lobby) lobbySelect.value = settings.bgm_lobby;
+    if (settings.bgm_question) questionSelect.value = settings.bgm_question;
+    // Render list
+    if (!list.length) {
+      container.innerHTML = '<p class="text-white/40 text-xs">No custom tracks uploaded yet.</p>';
+      return;
+    }
+    container.innerHTML = list.map(item => `
+      <div class="flex items-center gap-2 bg-white/10 rounded-lg px-3 py-2">
+        <button onclick="testBgmPreview_custom('${esc(item.filename)}')" class="text-white/70 hover:text-white text-sm shrink-0" title="Preview">▶</button>
+        <span class="text-sm text-white/80 font-bold truncate flex-1">${esc(item.original_name)}</span>
+        <span class="text-xs text-white/40 shrink-0">${item.category}</span>
+        <button onclick="deleteCustomAudio(${item.id})" class="text-red-400 hover:text-red-300 text-sm shrink-0" title="Delete">✕</button>
+      </div>
+    `).join('');
+  } catch {}
+}
+
+function testBgmPreview_custom(filename) {
+  if (_previewAudio) { try { _previewAudio.pause(); _previewAudio = null; } catch {} }
+  _previewAudio = new Audio(`/uploads/audio/${filename}`);
+  _previewAudio.volume = 0.5;
+  _previewAudio.play().catch(() => {});
+  setTimeout(() => { if (_previewAudio) { _previewAudio.pause(); _previewAudio = null; } }, 5000);
+}
+
 async function changePassword() {
   const currentPassword = document.getElementById('settings-current-pw').value;
   const newPassword     = document.getElementById('settings-new-pw').value;
@@ -856,6 +986,7 @@ function showSettingsTab(tab) {
     document.getElementById(`stab-panel-${t}`).classList.toggle('hidden', t !== tab);
     document.getElementById(`stab-${t}`).classList.toggle('stab-active', t === tab);
   });
+  if (tab === 'audio') loadCustomAudioList();
 }
 
 async function loadSettingsPanel() {
