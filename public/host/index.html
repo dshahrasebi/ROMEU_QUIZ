@@ -1550,7 +1550,10 @@ function _connectSocket() {
       optEl.style.fontSize = '';  // reset to CSS default
       document.getElementById(`tally-count-${i}`).textContent = '0';
       document.getElementById(`tally-bar-${i}`).style.width = '0%';
-      document.getElementById(`tally-bar-${i}`).closest('div.rounded-xl').style.outline = '';
+      const tileEl = document.getElementById(`tally-bar-${i}`).closest('div.rounded-xl');
+      tileEl.style.outline = '';
+      tileEl.style.opacity = '';
+      tileEl.style.filter = '';
     }
 
     // Auto-fit answer text in widescreen tiles
@@ -1606,11 +1609,14 @@ function _connectSocket() {
     hostAudio.stopMusic();
     hostAudio.play('reveal');
     document.getElementById('phase-badge').textContent = t('host.phase_reveal');
-    // Highlight correct answer tile
+    // Highlight correct answer tile, grey out incorrect
     for (let i = 0; i < 4; i++) {
-      const bar = document.getElementById(`tally-bar-${i}`);
+      const tile = document.getElementById(`tally-bar-${i}`).closest('div.rounded-xl');
       if (i === data.correctIndex) {
-        bar.closest('div.rounded-xl').style.outline = '3px solid #fff';
+        tile.style.outline = '3px solid #fff';
+      } else {
+        tile.style.opacity = '0.35';
+        tile.style.filter = 'grayscale(0.8)';
       }
     }
     // Color response chips by chosen option + streak badges
