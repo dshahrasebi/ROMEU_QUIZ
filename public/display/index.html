@@ -147,6 +147,13 @@ socket.on('game-ended', (data) => {
 
 socket.on('settings-updated', (data) => {
   if (data.ui_language) window.applyI18n(data.ui_language);
+  // Live-update audio settings so next phase transition uses new values
+  if (data.bgm_lobby !== undefined)    audio.bgmLobby    = data.bgm_lobby;
+  if (data.bgm_question !== undefined) audio.bgmQuestion  = data.bgm_question;
+  if (data.sound_enabled !== undefined) audio.enabled      = data.sound_enabled !== 'false';
+  if (data.music_volume !== undefined)  audio.musicVolume  = Math.max(0, Math.min(1, parseInt(data.music_volume, 10) / 100));
+  if (data.sfx_volume !== undefined)    audio.sfxVolume    = Math.max(0, Math.min(1, parseInt(data.sfx_volume, 10) / 100));
+  if (data.sfx_pack !== undefined)      audio.sfxPack      = data.sfx_pack;
 });
 
 // ── Phase renderer ────────────────────────────────────────────────────────────

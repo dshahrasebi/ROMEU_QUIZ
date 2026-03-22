@@ -320,14 +320,15 @@ app.put('/host/api/settings', requireHost, (req, res) => {
   if (Object.keys(errors).length) return res.status(400).json({ errors });
   db.setSettings(clean);
 
-  // Push language / display-mode changes to connected clients in real-time
-  if (clean.ui_language || clean.display_mode) {
+  // Push setting changes to connected clients in real-time
+  const LIVE_KEYS = ['ui_language','display_mode','bgm_lobby','bgm_question',
+    'sound_enabled','sfx_volume','music_volume','sfx_pack'];
+  const payload = {};
+  for (const k of LIVE_KEYS) { if (clean[k] !== undefined) payload[k] = clean[k]; }
+  if (Object.keys(payload).length) {
     const ioRef = req.app.get('io');
     const state = gameManager.getState();
     if (ioRef && state) {
-      const payload = {};
-      if (clean.ui_language) payload.ui_language = clean.ui_language;
-      if (clean.display_mode) payload.display_mode = clean.display_mode;
       ioRef.to(`session:${state.pin}`).emit('settings-updated', payload);
     }
   }
