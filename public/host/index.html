@@ -38,11 +38,11 @@
     /* Sidebar: compact PIN, leaderboard grows */
     #panel-game.widescreen > .grid > .col-span-1 { gap: 0.5rem; }
     #panel-game.widescreen #game-pin { font-size: 2rem; padding-top: 0; padding-bottom: 0; }
-    #panel-game.widescreen #qr-img { width: 5rem; height: 5rem; margin-top: 0.25rem; }
+    #panel-game.widescreen #qr-img { width: 80%; height: auto; max-width: 200px; margin-top: 0.25rem; }
     /* Players card: don't grow */
     #panel-game.widescreen > .grid > .col-span-1 > div:nth-child(2) { flex: 0 0 auto; }
     /* Leaderboard card: fill remaining sidebar space */
-    #panel-game.widescreen > .grid > .col-span-1 > div:nth-child(3) { flex: 1; overflow-y: auto; }
+    #panel-game.widescreen > .grid > .col-span-1 > div:nth-child(3) { flex: 1; overflow-y: auto; max-height: 30vh; }
     #panel-game.widescreen #leaderboard-sidebar { max-height: 100%; overflow-y: auto; }
 
     /* Question card: shares vertical space with tally bars */
