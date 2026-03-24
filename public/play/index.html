@@ -16,6 +16,26 @@
     .screen { display: none; }
     .screen.active { display: flex; }
 
+    /* ── Connection status banner ───────────────────────────────────────────── */
+    .connection-banner {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 9999;
+      background: #e53e3e;
+      color: #fff;
+      text-align: center;
+      padding: 8px 16px;
+      font-weight: 700;
+      font-size: 14px;
+      transition: transform 0.3s ease;
+    }
+    .connection-banner.hidden {
+      transform: translateY(-100%);
+      pointer-events: none;
+    }
+
     /* ── Question tile grid ─────────────────────────────────────────────── */
     .tile-grid {
       display: grid;
@@ -93,7 +113,10 @@
   </style>
 </head>
 <body class="gradient-bg flex flex-col h-screen">
-
+<!-- ── Connection status banner ────────────────────────────────────────────── -->
+<div id="connection-banner" class="connection-banner hidden">
+  <span id="connection-banner-text">Connection lost — reconnecting…</span>
+</div>
 <!-- ── Screen 1: PIN entry ────────────────────────────────────────────────── -->
 <div id="screen-pin" class="screen active flex-col items-center justify-center h-full p-6 gap-5">
   <div class="text-center">
@@ -392,7 +415,7 @@ document.getElementById('btn-confirm-no').onclick = () => {
 
 function _doJoin(nickname) {
   if (!socket || !socket.connected) {
-    socket = io({ transports: ['websocket'] });
+    socket = io();
     bindSocketEvents();
   }
   socket.once('connect', () => {
@@ -417,6 +440,8 @@ function bindSocketEvents() {
   // path which updates the player's socketId — so submitAnswer lookups work.
   // On the very first connect savedNickname is '' so this is a safe no-op.
   socket.on('connect', () => {
+    // Hide connection-lost banner on successful reconnect
+    document.getElementById('connection-banner').classList.add('hidden');
     if (savedPin && savedNickname) {
       socket.emit('join-lobby', { pin: savedPin, nickname: savedNickname });
     }
@@ -613,7 +638,22 @@ function bindSocketEvents() {
 
   socket.on('disconnect', () => {
     socketReady = false;
-    // Reconnect handled automatically by socket.io
+    // Show connection-lost banner (only if player has joined a session)
+    if (savedPin && savedNickname) {
+      const banner = document.getElementById('connection-banner');
+      document.getElementById('connection-banner-text').textContent =
+        t('play.connection_lost') || 'Connection lost \u2014 reconnecting\u2026';
+      banner.classList.remove('hidden');
+    }
+  });
+
+  socket.on('connect_error', () => {
+    if (savedPin && savedNickname) {
+      const banner = document.getElementById('connection-banner');
+      document.getElementById('connection-banner-text').textContent =
+        t('play.connection_error') || 'Connection issue \u2014 trying to reconnect\u2026';
+      banner.classList.remove('hidden');
+    }
   });
 }
 

@@ -90,7 +90,7 @@ let brandingSettings = {};
 
 // ── Socket connection ─────────────────────────────────────────────────────────
 
-const socket = io({ transports: ['websocket'] });
+const socket = io();
 
 socket.on('connect', () => {
   socket.emit('display-join', { pin });

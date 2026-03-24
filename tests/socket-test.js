@@ -547,6 +547,113 @@ function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
     check('Reconnect: Eve chosenIndex=0', rcReveal?.playerResults?.Eve?.chosenIndex === 0, `got ${rcReveal?.playerResults?.Eve?.chosenIndex}`);
     check('Reconnect: Eve pointsEarned > 0', rcReveal?.playerResults?.Eve?.pointsEarned > 0, `got ${rcReveal?.playerResults?.Eve?.pointsEarned}`);
 
+    // ── Test E: Reconnect receives question-start recovery ────────────────────
+    console.log('\n── Test E: Reconnect State Recovery (lobby-stuck fix) ──────────');
+
+    // End current session first, start a fresh 2-question quiz
+    [rcHost, rcP1New].forEach(s => s?.disconnect());
+    await sleep(200);
+
+    const srQR = await req({ path: '/host/api/quizzes', method: 'POST', headers: authH2 }, { name: 'State Recovery Quiz' });
+    const srQuizId = json(srQR.body)?.id;
+    await req({ path: `/host/api/quizzes/${srQuizId}/questions`, method: 'POST', headers: authH2 },
+      { text: 'SR Q1', options: ['A','B','C','D'], correctIndex: 1, timeLimitSeconds: 30 });
+    await req({ path: `/host/api/quizzes/${srQuizId}/questions`, method: 'POST', headers: authH2 },
+      { text: 'SR Q2', options: ['W','X','Y','Z'], correctIndex: 2, timeLimitSeconds: 30 });
+
+    const srSessR = await req({ path: '/host/api/session/start', method: 'POST', headers: authH2 }, { quizId: srQuizId });
+    const srPin = json(srSessR.body)?.pin;
+
+    const srHost = await connect(BASE, { extraHeaders: { cookie: cookie2 } });
+    const srP1   = await connect(BASE);
+
+    const srHostStateP = waitFor(srHost, 'host-state');
+    srHost.emit('host-join', { pin: srPin });
+    await srHostStateP;
+
+    const srP1JoinP = waitFor(srP1, 'join-success');
+    srP1.emit('join-lobby', { pin: srPin, nickname: 'Frank' });
+    await srP1JoinP;
+
+    // Disconnect P1 BEFORE host starts question (simulates the lobby-stuck bug)
+    srP1.disconnect();
+    await sleep(300);
+
+    // Host starts question — P1 is disconnected, misses question-start
+    const srQ1HostP = waitFor(srHost, 'question-start');
+    await req({ path: '/host/api/session/next', method: 'POST', headers: authH2 });
+    await srQ1HostP;
+
+    // P1 reconnects — should receive question-start as state recovery
+    const srP1New = await connect(BASE);
+    const srP1QStartP = waitFor(srP1New, 'question-start', 5000);
+    const srP1JoinP2 = waitFor(srP1New, 'join-success');
+    srP1New.emit('join-lobby', { pin: srPin, nickname: 'Frank' });
+    await srP1JoinP2;
+
+    const srRecoveredQ = await srP1QStartP;
+    check('State recovery: question-start emitted on rejoin', !!srRecoveredQ);
+    check('State recovery: correct question text', srRecoveredQ?.text === 'SR Q1', `got "${srRecoveredQ?.text}"`);
+    check('State recovery: has options', srRecoveredQ?.options?.length === 4);
+    check('State recovery: has timeLimitSeconds', srRecoveredQ?.timeLimitSeconds === 30);
+    check('State recovery: has questionOpenAt', typeof srRecoveredQ?.questionOpenAt === 'number');
+
+    // P1 can submit answer after recovery
+    const srP1AccP  = waitFor(srP1New, 'answer-accepted');
+    const srRevealP = waitFor(srHost, 'question-reveal', 8000);
+    srP1New.emit('submit-answer', { optionIndex: 1 });
+    const srAcc = await srP1AccP;
+    check('State recovery: answer-accepted after recovery', !!srAcc);
+
+    const srReveal = await srRevealP;
+    check('State recovery: Frank correct=true', srReveal?.playerResults?.Frank?.correct === true);
+
+    // Advance to leaderboard — verify reconnected player gets it
+    const srLbHostP = waitFor(srHost, 'leaderboard-update');
+    const srLbP1P   = waitFor(srP1New, 'leaderboard-update', 5000);
+    await req({ path: '/host/api/session/next', method: 'POST', headers: authH2 });
+    await srLbHostP;
+    const srLb = await srLbP1P;
+    check('State recovery: player receives leaderboard after recovery', !!srLb);
+
+    // Test reconnect during reveal phase
+    console.log('\n── Test E2: Reconnect During Reveal Phase ────────────────────────');
+
+    const srQ2HostP = waitFor(srHost, 'question-start');
+    const srQ2P1P   = waitFor(srP1New, 'question-start');
+    await req({ path: '/host/api/session/next', method: 'POST', headers: authH2 });
+    await srQ2HostP;
+    await srQ2P1P;
+
+    // P1 answers, triggering auto-reveal
+    const srP1AccQ2P = waitFor(srP1New, 'answer-accepted');
+    const srQ2RevP   = waitFor(srHost, 'question-reveal', 8000);
+    srP1New.emit('submit-answer', { optionIndex: 2 });
+    await srP1AccQ2P;
+    await srQ2RevP;
+
+    // Disconnect P1 during reveal phase, then reconnect
+    srP1New.disconnect();
+    await sleep(300);
+
+    const srP1Rev = await connect(BASE);
+    const srP1RevealP = waitFor(srP1Rev, 'question-reveal', 5000);
+    const srP1JoinP3 = waitFor(srP1Rev, 'join-success');
+    srP1Rev.emit('join-lobby', { pin: srPin, nickname: 'Frank' });
+    await srP1JoinP3;
+
+    const srRecoveredRev = await srP1RevealP;
+    check('Reveal recovery: question-reveal emitted on rejoin', !!srRecoveredRev);
+    check('Reveal recovery: has correctIndex', typeof srRecoveredRev?.correctIndex === 'number');
+    check('Reveal recovery: has playerResults', !!srRecoveredRev?.playerResults);
+
+    // Cleanup
+    [srHost, srP1Rev].forEach(s => s?.disconnect());
+    try {
+      await req({ path: `/host/api/quizzes/${srQuizId}`, method: 'DELETE', headers: authH2 });
+      console.log('  INFO  State recovery quiz deleted');
+    } catch {}
+
     // Cleanup reconnect quiz
     [rcHost, rcP1New].forEach(s => s?.disconnect());
     try {

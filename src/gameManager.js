@@ -403,6 +403,7 @@ module.exports = {
   getState,
   getPublicState,
   startSession,
+  buildRevealPayload: _buildRevealPayload,
   addPlayer,
   reconnectPlayer,
   playerDisconnected,

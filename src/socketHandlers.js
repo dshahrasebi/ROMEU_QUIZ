@@ -108,6 +108,67 @@ function _startNextQuestion(io, pin, gameManager) {
   });
 }
 
+// ── Player state recovery — send current game state to (re)joining player ────
+function _emitPlayerStateRecovery(io, socket, state, player, gameManager) {
+  if (state.status === 'lobby') return;
+  const pin = state.pin;
+
+  if (state.status === 'question') {
+    const q = state.questions[state.currentQuestionIndex];
+    const basePayload = {
+      questionIndex:  state.currentQuestionIndex,
+      totalQuestions: state.questions.length,
+      text:           q.text,
+      timeLimitSeconds: q.time_limit_seconds,
+      type:    q.type || 'mcq',
+      imageUrl: q.image_url || null,
+      questionOpenAt: state.questionOpenAt,
+      players: Array.from(state.players.values()).filter(p => p.connected).map(p => p.nickname),
+    };
+
+    let options = q.options;
+    if (state.settings?.shuffleOptions) {
+      const optCount = q.options.length;
+      const perm = Array.from({ length: optCount }, (_, i) => i);
+      for (let i = perm.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [perm[i], perm[j]] = [perm[j], perm[i]];
+      }
+      player._optionMap = perm;
+      options = perm.map(i => q.options[i]);
+    }
+
+    socket.emit('question-start', { ...basePayload, options });
+
+    // If this player already answered, immediately lock their tiles
+    if (state.answers.has(player.playerId)) {
+      socket.emit('answer-accepted', { optionIndex: -1 });
+    }
+    return;
+  }
+
+  if (state.status === 'reveal') {
+    socket.emit('question-reveal', gameManager.buildRevealPayload());
+    return;
+  }
+
+  if (state.status === 'leaderboard') {
+    const leaderboard = gameManager.getLeaderboard();
+    const durSecs = state.settings?.leaderboardDurationSeconds || 0;
+    socket.emit('leaderboard-update', { leaderboard, leaderboardDurationSeconds: durSecs });
+    return;
+  }
+
+  if (state.status === 'ended') {
+    const leaderboard = gameManager.getLeaderboard();
+    socket.emit('game-ended', {
+      podium: leaderboard.slice(0, 3),
+      allPlayers: leaderboard,
+      archived: false,
+    });
+  }
+}
+
 /**
  * registerHandlers — wires all Socket.io events for host, display, and player.
  * Called once from server.js after io is created.
@@ -321,6 +382,7 @@ function registerHandlers(io, db, gameManager, sessionMiddleware) {
           nickname: existingEntry.nickname,
           playerCount: state.settings?.showPlayerCount !== false ? state.players.size : null,
         });
+        _emitPlayerStateRecovery(io, socket, state, existingEntry, gameManager);
       } else {
         // ── New player — enforce late-join and capacity gates ────────────────
         const maxPlayers = state.settings?.maxPlayers ?? 30;
@@ -349,6 +411,8 @@ function registerHandlers(io, db, gameManager, sessionMiddleware) {
           nickname: trimmed,
           playerCount: state.settings?.showPlayerCount !== false ? state.players.size : null,
         });
+        const newPlayer = state.players.get(socket.id);
+        _emitPlayerStateRecovery(io, socket, state, newPlayer, gameManager);
       }
 
       // Broadcast lobby update to everyone in session

@@ -742,7 +742,7 @@ app.delete('/host/api/questions/:id', requireHost, (req, res) => {
 // ── HTTP server + Socket.io ───────────────────────────────────────────────────
 
 const server = http.createServer(app);
-const io     = new Server(server, { transports: ['websocket'], cors: false });
+const io     = new Server(server, { cors: false });
 
 // Share io with modules that need to emit
 app.set('io', io);

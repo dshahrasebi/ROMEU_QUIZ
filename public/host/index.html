@@ -1638,7 +1638,7 @@ async function startSession(quizId, quizName) {
 
 function _connectSocket() {
   if (socket) socket.disconnect();
-  socket = io({ transports: ['websocket'] });
+  socket = io();
 
   socket.on('connect', () => {
     socket.emit('host-join', { pin: activePin });
