@@ -1836,7 +1836,8 @@ function updatePlayerChips(players) {
   const el = document.getElementById('player-chips');
   document.getElementById('player-count').textContent = players.length;
   el.innerHTML = players.map(p => `
-    <span class="chip-pop bg-white/25 text-white text-sm font-bold px-3 py-1 rounded-full inline-flex items-center gap-1">
+    <span class="chip-pop bg-white/25 text-white text-sm font-bold px-3 py-1 rounded-full inline-flex items-center gap-1.5">
+      <span style="width:8px;height:8px;border-radius:50%;flex-shrink:0;background:${p.connected === false ? '#ef4444' : '#22c55e'}"></span>
       ${esc(p.nickname)}
       <button onclick="kickPlayer('${esc(p.nickname).replace(/'/g, "\\'")}')"
         class="ml-1 text-white/40 hover:text-red-400 text-xs leading-none"

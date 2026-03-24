@@ -273,7 +273,7 @@ function registerHandlers(io, db, gameManager, sessionMiddleware) {
 
       // Update lobby for everyone
       io.to(`session:${pin}`).emit('lobby-update', {
-        players: Array.from(state.players.values()).map(p => ({ nickname: p.nickname })),
+        players: Array.from(state.players.values()).map(p => ({ nickname: p.nickname, connected: p.connected })),
         playerCount: state.settings?.showPlayerCount !== false ? state.players.size : null,
       });
     });
@@ -417,7 +417,7 @@ function registerHandlers(io, db, gameManager, sessionMiddleware) {
 
       // Broadcast lobby update to everyone in session
       io.to(`session:${pin}`).emit('lobby-update', {
-        players: Array.from(state.players.values()).map(p => ({ nickname: p.nickname })),
+        players: Array.from(state.players.values()).map(p => ({ nickname: p.nickname, connected: p.connected })),
         playerCount: state.settings?.showPlayerCount !== false ? state.players.size : null,
       });
     });
@@ -481,7 +481,7 @@ function registerHandlers(io, db, gameManager, sessionMiddleware) {
         const state = gameManager.getState();
         if (state) {
           io.to(`session:${state.pin}`).emit('lobby-update', {
-            players: Array.from(state.players.values()).map(p => ({ nickname: p.nickname })),
+            players: Array.from(state.players.values()).map(p => ({ nickname: p.nickname, connected: p.connected })),
             playerCount: state.settings?.showPlayerCount !== false ? state.players.size : null,
           });
         }
