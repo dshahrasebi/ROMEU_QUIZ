@@ -89,26 +89,37 @@
   <div class="flex items-center justify-between mb-6">
     <div class="flex items-center gap-4">
       <img src="/logo.svg" alt="Romeu Quiz" class="romeu-logo romeu-logo-host" onerror="this.src='/logo.png'">
-      <h1 class="text-3xl font-black" data-i18n="host.your_quizzes">Your Quizzes</h1>
+      <h1 class="text-3xl font-black" data-i18n="host.your_quizzes">🎮 Your Quizzes</h1>
     </div>
-    <div class="flex gap-3">
+    <div class="flex gap-2 flex-wrap items-center">
       <button id="btn-new-quiz"
-        class="bg-white text-purple-800 font-black px-5 py-2 rounded-xl hover:bg-purple-50 transition-colors"
+        class="bg-white text-purple-800 font-black px-4 py-2 rounded-xl hover:bg-purple-50 transition-colors"
         data-i18n="host.btn_new_quiz">
         ＋ New Quiz
       </button>
+      <button onclick="exportAllQuizzes()"
+        class="bg-white/20 hover:bg-white/30 text-white font-bold px-3 py-2 rounded-xl transition-colors text-sm"
+        data-i18n="host.btn_export_all" title="Download backup of all quizzes">
+        📥 Export All
+      </button>
+      <button onclick="document.getElementById('import-quiz-file').click()"
+        class="bg-white/20 hover:bg-white/30 text-white font-bold px-3 py-2 rounded-xl transition-colors text-sm"
+        data-i18n="host.btn_import" title="Import quizzes from JSON file">
+        📤 Import Quiz
+      </button>
+      <input type="file" id="import-quiz-file" accept=".json,application/json" class="hidden" onchange="handleImportFile(event)">
       <button onclick="showPanel('settings')"
-        class="bg-white/20 hover:bg-white/30 text-white font-bold px-4 py-2 rounded-xl transition-colors"
+        class="bg-white/20 hover:bg-white/30 text-white font-bold px-3 py-2 rounded-xl transition-colors text-sm"
         data-i18n="host.btn_settings">
         ⚙ Settings
       </button>
       <button onclick="showPanel('history')"
-        class="bg-white/20 hover:bg-white/30 text-white font-bold px-4 py-2 rounded-xl transition-colors"
+        class="bg-white/20 hover:bg-white/30 text-white font-bold px-3 py-2 rounded-xl transition-colors text-sm"
         data-i18n="host.btn_history">
         📊 History
       </button>
       <form method="POST" action="/host/logout" style="display:inline">
-        <button type="submit" class="bg-white/20 hover:bg-white/30 text-white font-bold px-4 py-2 rounded-xl transition-colors"
+        <button type="submit" class="bg-white/20 hover:bg-white/30 text-white font-bold px-3 py-2 rounded-xl transition-colors text-sm"
           data-i18n="host.btn_sign_out">
           Sign Out
         </button>
@@ -1133,10 +1144,12 @@ function renderQuizList(quizzes) {
           class="bg-white text-purple-800 font-black px-4 py-2 rounded-xl hover:bg-purple-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
           ▶ Start
         </button>
-        <button onclick="deleteQuiz(${q.id})"
-          class="text-white/40 hover:text-red-300 text-xl transition-colors px-2">🗑</button>
+        <button onclick="exportQuiz(${q.id})"
+          class="text-white/40 hover:text-white text-xl transition-colors px-2" title="Export quiz (JSON)">📥</button>
         <button onclick="duplicateQuiz(${q.id})"
           class="text-white/40 hover:text-white text-xl transition-colors px-2" title="Duplicate quiz">⧉</button>
+        <button onclick="deleteQuiz(${q.id})"
+          class="text-white/40 hover:text-red-300 text-xl transition-colors px-2" title="Delete quiz">🗑</button>
       </div>
 
       <!-- Question list (load on expand) -->
@@ -1503,6 +1516,39 @@ async function duplicateQuiz(quizId) {
   const res = await apiFetch(`/host/api/quizzes/${quizId}/duplicate`, { method: 'POST' });
   if (!res.ok) { const e = await res.json(); alert(e.error); return; }
   await loadQuizzes();
+}
+
+function exportQuiz(quizId) {
+  window.location.href = `/host/api/quizzes/${quizId}/export`;
+}
+
+function exportAllQuizzes() {
+  window.location.href = '/host/api/quizzes/export/all';
+}
+
+async function handleImportFile(event) {
+  const file = event.target.files?.[0];
+  if (!file) return;
+  try {
+    const text = await file.text();
+    const data = JSON.parse(text);
+    const res = await apiFetch('/host/api/quizzes/import', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (res.ok) {
+      await loadQuizzes();
+      alert(t('host.import_success'));
+    } else {
+      const err = await res.json();
+      alert(err.error || t('host.import_error'));
+    }
+  } catch (err) {
+    alert(t('host.import_error'));
+  } finally {
+    event.target.value = '';
+  }
 }
 
 async function loadHistory() {

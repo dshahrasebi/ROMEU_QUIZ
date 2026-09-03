@@ -67,6 +67,11 @@ window.I18N = {
     /* ── Host – library panel ───────────────────────────────────────────── */
     'host.your_quizzes':        '🎮 Your Quizzes',
     'host.btn_new_quiz':        '＋ New Quiz',
+    'host.btn_export_all':      '📥 Export All',
+    'host.btn_import':          '📤 Import Quiz',
+    'host.btn_export':          'Export',
+    'host.import_success':      'Quiz(zes) imported successfully!',
+    'host.import_error':        'Failed to import quiz. Check file format.',
     'host.btn_settings':        '⚙ Settings',
     'host.btn_history':         '📊 History',
     'host.btn_sign_out':        'Sign Out',
@@ -325,6 +330,11 @@ window.I18N = {
     /* ── Host – library panel ───────────────────────────────────────────── */
     'host.your_quizzes':        '🎮 Tus Quizzes',
     'host.btn_new_quiz':        '＋ Nuevo Quiz',
+    'host.btn_export_all':      '📥 Exportar Todo',
+    'host.btn_import':          '📤 Importar Quiz',
+    'host.btn_export':          'Exportar',
+    'host.import_success':      '¡Quiz(zes) importado(s) con éxito!',
+    'host.import_error':        'Error al importar quiz. Revisa el formato del archivo.',
     'host.btn_settings':        '⚙ Configuración',
     'host.btn_history':         '📊 Historial',
     'host.btn_sign_out':        'Cerrar sesión',

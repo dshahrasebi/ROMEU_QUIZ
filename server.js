@@ -533,6 +533,99 @@ app.get('/host/api/quizzes', requireHost, (_req, res) => {
   res.json(db.getAllQuizzes());
 });
 
+app.get('/host/api/quizzes/export/all', requireHost, (_req, res) => {
+  const quizzes = db.getAllQuizzes();
+  const allData = quizzes.map(q => {
+    const full = db.getQuizById(q.id);
+    return {
+      name: full.name,
+      questions: (full.questions || []).map(question => ({
+        text: question.text,
+        options: question.options,
+        correctIndex: question.correct_index,
+        timeLimitSeconds: question.time_limit_seconds,
+        type: question.type || 'mcq',
+        imageUrl: question.image_url || null,
+        explanation: question.explanation || null,
+      })),
+    };
+  });
+  const exportPayload = {
+    formatVersion: 1,
+    exportedAt: new Date().toISOString(),
+    quizzes: allData,
+  };
+  res.setHeader('Content-Disposition', 'attachment; filename="romeu_quizzes_backup.json"');
+  res.setHeader('Content-Type', 'application/json');
+  return res.json(exportPayload);
+});
+
+app.post('/host/api/quizzes/import', requireHost, (req, res) => {
+  const body = req.body;
+  if (!body || typeof body !== 'object') {
+    return res.status(400).json({ error: t('err.quiz.import_invalid') });
+  }
+
+  let quizzesToImport = [];
+  if (Array.isArray(body)) {
+    quizzesToImport = body;
+  } else if (Array.isArray(body.quizzes)) {
+    quizzesToImport = body.quizzes;
+  } else if (body.name && Array.isArray(body.questions)) {
+    quizzesToImport = [body];
+  } else {
+    return res.status(400).json({ error: t('err.quiz.import_invalid') });
+  }
+
+  if (quizzesToImport.length === 0) {
+    return res.status(400).json({ error: t('err.quiz.import_invalid') });
+  }
+
+  const createdQuizzes = [];
+  for (const item of quizzesToImport) {
+    const name = String(item.name || 'Imported Quiz').trim().slice(0, 100) || 'Imported Quiz';
+    const quiz = db.createQuiz(name);
+    const questions = Array.isArray(item.questions) ? item.questions : [];
+    for (const q of questions) {
+      if (!q.text || !String(q.text).trim()) continue;
+      const questionType = q.type === 'truefalse' ? 'truefalse' : 'mcq';
+      let options = q.options;
+      if (typeof options === 'string') {
+        try { options = JSON.parse(options); } catch { options = null; }
+      }
+      if (questionType === 'truefalse') {
+        options = ['True', 'False'];
+      } else if (!Array.isArray(options) || options.length !== 4) {
+        options = (Array.isArray(options) && options.length === 4) ? options : ['Option 1', 'Option 2', 'Option 3', 'Option 4'];
+      }
+      const rawCI = q.correctIndex !== undefined ? q.correctIndex : q.correct_index;
+      const ci = Number.isInteger(Number(rawCI)) ? Number(rawCI) : 0;
+      const rawTLS = q.timeLimitSeconds !== undefined ? q.timeLimitSeconds : q.time_limit_seconds;
+      const tls = Number.isInteger(Number(rawTLS)) ? Number(rawTLS) : 20;
+      const img = typeof q.imageUrl === 'string' ? q.imageUrl.trim() : (typeof q.image_url === 'string' ? q.image_url.trim() : null);
+      const expl = typeof q.explanation === 'string' ? q.explanation.trim() : null;
+
+      db.addQuestion(
+        quiz.id,
+        String(q.text).trim(),
+        options,
+        Math.max(0, Math.min(questionType === 'truefalse' ? 1 : 3, ci)),
+        Math.max(5, Math.min(120, tls)),
+        questionType,
+        img || null,
+        expl || null
+      );
+    }
+    const full = db.getQuizById(quiz.id);
+    createdQuizzes.push({ ...full, question_count: full.questions.length });
+  }
+
+  return res.status(201).json({
+    importedCount: createdQuizzes.length,
+    quizzes: createdQuizzes,
+  });
+});
+
 app.post('/host/api/quizzes', requireHost, (req, res) => {
   const name = (req.body.name ?? '').trim();
   if (!name || name.length > 100) {
@@ -546,6 +639,27 @@ app.get('/host/api/quizzes/:id', requireHost, (req, res) => {
   const quiz = db.getQuizById(Number(req.params.id));
   if (!quiz) return res.status(404).json({ error: t('err.quiz.not_found') });
   return res.json(quiz);
+});
+
+app.get('/host/api/quizzes/:id/export', requireHost, (req, res) => {
+  const quiz = db.getQuizById(Number(req.params.id));
+  if (!quiz) return res.status(404).json({ error: t('err.quiz.not_found') });
+  const exportData = {
+    formatVersion: 1,
+    name: quiz.name,
+    questions: (quiz.questions || []).map(q => ({
+      text: q.text,
+      options: q.options,
+      correctIndex: q.correct_index,
+      timeLimitSeconds: q.time_limit_seconds,
+      type: q.type || 'mcq',
+      imageUrl: q.image_url || null,
+      explanation: q.explanation || null,
+    })),
+  };
+  res.setHeader('Content-Disposition', `attachment; filename="${quiz.name.replace(/[^a-zA-Z0-9_-]/g, '_')}.json"`);
+  res.setHeader('Content-Type', 'application/json');
+  return res.json(exportData);
 });
 
 app.put('/host/api/quizzes/:id', requireHost, (req, res) => {

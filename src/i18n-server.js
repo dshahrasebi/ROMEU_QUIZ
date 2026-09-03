@@ -44,6 +44,7 @@ const MESSAGES = {
     // ── Quiz CRUD ────────────────────────────────────────────────────────────
     'err.quiz.name_required':     'name is required (1–100 characters)',
     'err.quiz.not_found':         'Quiz not found',
+    'err.quiz.import_invalid':    'Invalid import format: expected quiz object or array of quizzes',
 
     // ── Question validation ───────────────────────────────────────────────────
     'err.q.text_required':        'text is required',
@@ -109,6 +110,7 @@ const MESSAGES = {
     // ── Quiz CRUD ────────────────────────────────────────────────────────────
     'err.quiz.name_required':     'El nombre es obligatorio (1–100 caracteres)',
     'err.quiz.not_found':         'Cuestionario no encontrado',
+    'err.quiz.import_invalid':    'Formato de importación no válido: se esperaba un objeto de quiz o array de quizzes',
 
     // ── Question validation ───────────────────────────────────────────────────
     'err.q.text_required':        'El texto es obligatorio',
