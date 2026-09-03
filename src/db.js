@@ -242,7 +242,7 @@ const getSessionAnswerBreakdown = (sessionId) => {
 const SETTING_DEFAULTS = {
   platform_name:                'ROMEU Quiz',
   logo_url:                     '',
-  accent_color:                 '#7c3aed',
+  accent_color:                 '#55b878',
   default_time_limit:           '20',
   max_players:                  '30',
   streak_bonus_3:               '100',

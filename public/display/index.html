@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Display · Quiz Platform</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="/shared.css">
   <script src="/audio.js"></script>
@@ -40,10 +40,11 @@
    Display view — full-screen projector
    ════════════════════════════════════════════════════════════════════════════ */
 
-const pin = new URLSearchParams(location.search).get('pin');
+let pin = new URLSearchParams(location.search).get('pin');
 const stage = document.getElementById('stage');
 let currentState = null;
 let ringRaf = null;
+let activeSessionPoll = null;
 
 // ── Audio ─────────────────────────────────────────────────────────────────────
 const audio = new AudioManager();
@@ -93,12 +94,42 @@ let brandingSettings = {};
 const socket = io();
 
 socket.on('connect', () => {
-  socket.emit('display-join', { pin });
+  joinDisplaySession();
 });
+
+async function joinDisplaySession() {
+  if (!pin) {
+    try {
+      const response = await fetch('/api/session/active');
+      const session = await response.json();
+      if (session.active) pin = session.pin;
+    } catch { /* retry below */ }
+  }
+
+  if (pin) {
+    socket.emit('display-join', { pin });
+    if (activeSessionPoll) {
+      clearInterval(activeSessionPoll);
+      activeSessionPoll = null;
+    }
+  }
+}
+
+// Allow the projector to be opened before the host starts a game.
+if (!pin) {
+  activeSessionPoll = setInterval(joinDisplaySession, 2000);
+  joinDisplaySession();
+}
 
 socket.on('display-state', (data) => {
   currentState = data;
   renderPhase(data);
+  if (data.status === 'idle' && !activeSessionPoll) {
+    // A stale PIN can survive after a previous game ended. Re-discover the next session.
+    pin = null;
+    activeSessionPoll = setInterval(joinDisplaySession, 2000);
+    joinDisplaySession();
+  }
 });
 
 socket.on('lobby-update', (data) => {
@@ -180,7 +211,7 @@ function renderPhase(state) {
     default:
       stage.innerHTML = `
         <div class="text-center">
-          <div class="text-6xl mb-4">🎮</div>
+            <img src="/logo.svg" alt="Romeu Quiz" class="romeu-logo romeu-logo-wait mb-4" onerror="this.src='/logo.png'">
           <h1 class="text-4xl font-black">${t('disp.waiting_host')}</h1>
         </div>`;
   }
@@ -190,8 +221,8 @@ function renderPhase(state) {
 
 function renderLobby(state) {
   const logoHtml = brandingSettings.logo_url
-    ? `<img src="${esc(brandingSettings.logo_url)}" alt="Logo" class="rounded-2xl shadow-xl mb-2" style="max-height:80px;max-width:240px;object-fit:contain" onerror="this.remove()">`
-    : '';
+    ? `<img src="${esc(brandingSettings.logo_url)}" alt="Logo" class="rounded-2xl shadow-xl mb-2" style="max-height:80px;max-width:240px;object-fit:contain" onerror="this.src='/logo.svg'">`
+    : `<img src="/logo.svg" alt="Romeu Quiz" class="romeu-logo romeu-logo-display mb-2" onerror="this.src='/logo.png'">`;
   const pc = state.playerCount;
   const pcHtml = (pc !== null && pc !== undefined)
     ? `<p id="lobby-player-count" class="text-2xl font-bold text-white/80">${pc !== 1 ? t('disp.players_joined_p', { n: pc }) : t('disp.players_joined_s', { n: pc })}</p>`
@@ -251,8 +282,8 @@ function renderQuestion(state) {
         <span id="answer-progress" class="bg-white/20 px-4 py-2 rounded-full font-bold text-lg">0 / ?</span>
 
         <!-- SVG countdown ring -->
-        <div class="flex flex-col items-center gap-1">
-          <svg viewBox="0 0 120 120" width="90" height="90">
+        <div class="relative flex-shrink-0" style="width:90px;height:90px">
+          <svg viewBox="0 0 120 120" width="90" height="90" style="display:block">
             <circle id="ring-bg" cx="60" cy="60" r="54"
               fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="8"/>
             <circle id="ring-circle" cx="60" cy="60" r="54"
@@ -262,7 +293,7 @@ function renderQuestion(state) {
               stroke-linecap="round"
               style="transform:rotate(-90deg);transform-origin:center"/>
           </svg>
-          <span id="ring-timer" class="font-black text-2xl -mt-8" style="position:relative;z-index:1">${tls}</span>
+          <span id="ring-timer" class="font-black text-2xl" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;z-index:1">${tls}</span>
         </div>
       </div>
 

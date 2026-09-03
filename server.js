@@ -115,6 +115,8 @@ app.use('/host',       express.static(path.join(__dirname, 'public/host'), stati
 app.use('/display',    express.static(path.join(__dirname, 'public/display'), staticOpts));
 app.use('/play',       express.static(path.join(__dirname, 'public/play'), staticOpts));
 app.use('/shared.css', express.static(path.join(__dirname, 'public/shared.css'), staticOpts));
+app.use('/logo.png',   express.static(path.join(__dirname, 'public/logo.png'), staticOpts));
+app.use('/logo.svg',   express.static(path.join(__dirname, 'public/logo.svg'), staticOpts));
 app.use('/audio.js',   express.static(path.join(__dirname, 'public/audio.js'), staticOpts));
 app.use('/audio',      express.static(path.join(__dirname, 'public/audio'), staticOpts));
 app.use('/uploads/audio', express.static(path.join(DATA_PATH, 'audio'), staticOpts));
@@ -510,6 +512,12 @@ app.post('/host/api/session/end', requireHost, (req, res) => {
 });
 
 // ── Public session lookup ─────────────────────────────────────────────────────
+
+app.get('/api/session/active', (_req, res) => {
+  const state = gameManager.getState();
+  if (!state) return res.json({ active: false });
+  return res.json({ active: true, pin: state.pin, status: state.status });
+});
 
 app.get('/api/session/:pin', (req, res) => {
   const row = db.getSessionByPin(req.params.pin);
