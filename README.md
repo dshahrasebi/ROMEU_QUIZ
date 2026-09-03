@@ -86,7 +86,7 @@ Listening on port 3000
 | `SESSION_SECRET` | **yes** | Signs session cookies. Generate with `openssl rand -hex 32`. |
 | `PORT` | no | HTTP port. Defaults to `3000`. Set automatically by Railway. |
 | `NODE_ENV` | no | Set to `production` to enable `secure` cookies and CSP headers. Required on Railway. |
-| `DATA_PATH` | no | Directory for `quiz.db`. Defaults to `/data` (Railway volume). Use `./data` locally. |
+| `DATA_PATH` | no | Directory for `quiz.db`. Defaults to `/data`. Auto-detects Railway's mounted Volume via `RAILWAY_VOLUME_MOUNT_PATH` in production — leave unset there. Use `./data` locally. |
 
 > **Security**: `HOST_PASSWORD` and `SESSION_SECRET` must never be committed to source control. Keep them in environment variables only.
 
@@ -112,6 +112,8 @@ Listening on port 3000
 2. Go to [Railway](https://railway.app) → **New Project** → **Deploy from GitHub repo**
 3. Attach a **Volume** and mount it at `/data` for SQLite persistence (under **Settings → Volumes → Add Volume**, Mount Path = `/data`).
    - **Note on Branch / PR Environments:** Railway creates isolated environments for each branch or PR deploy. Persistent Volumes in Railway are environment-specific and not shared by default. To preserve data on a branch environment, attach a Volume at `/data` for that branch service as well, or use the host panel's **📥 Export All** / **📤 Import Quiz** feature to migrate quiz libraries between environments.
+   - **Do not set `DATA_PATH` in Railway.** The server auto-detects the Volume via Railway's own `RAILWAY_VOLUME_MOUNT_PATH` variable. If `DATA_PATH` is left over from an earlier setup pointing at a relative path (e.g. `./data`), the server now ignores it in production and logs a warning — but it's safest to simply delete that variable in Railway's **Variables** tab.
+   - If a deploy's logs show `WARNING: No RAILWAY_VOLUME_MOUNT_PATH detected`, no Volume is attached to that service/environment and all data will be lost on the next redeploy — attach one before creating quizzes.
 4. Add the following environment variables in the **Variables** tab:
 
 ```

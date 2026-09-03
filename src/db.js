@@ -2,8 +2,8 @@
 
 const Database = require('better-sqlite3');
 const path = require('path');
+const { DATA_PATH } = require('./dataPath');
 
-const DATA_PATH = process.env.DATA_PATH ?? '/data';
 const DB_PATH = path.join(DATA_PATH, 'quiz.db');
 
 const db = new Database(DB_PATH);
