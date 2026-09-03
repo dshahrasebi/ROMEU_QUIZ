@@ -21,7 +21,7 @@ const fs        = require('fs');
 const multer    = require('multer');
 
 // Ensure data directory exists before opening SQLite
-const DATA_PATH = process.env.DATA_PATH || '/data';
+const { DATA_PATH } = require('./src/dataPath');
 fs.mkdirSync(DATA_PATH, { recursive: true });
 fs.mkdirSync(path.join(DATA_PATH, 'audio'), { recursive: true });
 
