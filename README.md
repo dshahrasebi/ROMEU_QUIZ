@@ -110,7 +110,8 @@ Listening on port 3000
 
 1. Push the repository to GitHub
 2. Go to [Railway](https://railway.app) → **New Project** → **Deploy from GitHub repo**
-3. Attach a **Volume** and mount it at `/data` for SQLite persistence
+3. Attach a **Volume** and mount it at `/data` for SQLite persistence (under **Settings → Volumes → Add Volume**, Mount Path = `/data`).
+   - **Note on Branch / PR Environments:** Railway creates isolated environments for each branch or PR deploy. Persistent Volumes in Railway are environment-specific and not shared by default. To preserve data on a branch environment, attach a Volume at `/data` for that branch service as well, or use the host panel's **📥 Export All** / **📤 Import Quiz** feature to migrate quiz libraries between environments.
 4. Add the following environment variables in the **Variables** tab:
 
 ```
@@ -120,7 +121,7 @@ SESSION_SECRET=<openssl rand -hex 32>
 NODE_ENV=production
 ```
 
-`PORT` is injected automatically by Railway — do not set it manually.
+`PORT` is injected automatically by Railway — do not set it manually. Leave `DATA_PATH` unset (defaults to `/data` where the volume is mounted).
 
 The `railway.toml` in the repository root configures the Nixpacks build, start command (`node server.js`), and health check path (`/health`) automatically.
 

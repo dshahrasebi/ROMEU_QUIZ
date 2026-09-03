@@ -320,6 +320,52 @@ async function testDuplicate(quizId) {
   return newQuiz?.id;
 }
 
+async function testQuizExportImport(quizId) {
+  console.log('\n── Quiz Export & Import ──────────────────────────────────────────');
+
+  // Export single quiz
+  const expSingle = await req({ path: `/host/api/quizzes/${quizId}/export`, method: 'GET', headers: authHeaders() });
+  check('GET /quizzes/:id/export → 200', expSingle.status === 200);
+  const singleData = json(expSingle.body);
+  check('Exported quiz has formatVersion', singleData?.formatVersion === 1);
+  check('Exported quiz has questions array', Array.isArray(singleData?.questions) && singleData.questions.length > 0);
+
+  // Export all quizzes
+  const expAll = await req({ path: '/host/api/quizzes/export/all', method: 'GET', headers: authHeaders() });
+  check('GET /quizzes/export/all → 200', expAll.status === 200);
+  const allData = json(expAll.body);
+  check('Export all returns quizzes array', Array.isArray(allData?.quizzes) && allData.quizzes.length >= 1);
+
+  // Import single quiz
+  const importSingle = await req(
+    { path: '/host/api/quizzes/import', method: 'POST', headers: authHeaders() },
+    {
+      name: 'Imported Test Quiz',
+      questions: [
+        { text: 'What is 10*10?', options: ['10', '50', '100', '1000'], correctIndex: 2, timeLimitSeconds: 20 },
+        { text: 'Earth is flat', options: ['True', 'False'], correctIndex: 1, timeLimitSeconds: 15, type: 'truefalse' }
+      ]
+    }
+  );
+  check('POST /quizzes/import single → 201', importSingle.status === 201);
+  const impSingleRes = json(importSingle.body);
+  check('Import single returns importedCount=1', impSingleRes?.importedCount === 1);
+  const impQuizId = impSingleRes?.quizzes?.[0]?.id;
+  check('Imported quiz has 2 questions', impSingleRes?.quizzes?.[0]?.question_count === 2);
+
+  // Import invalid payload
+  const importBad = await req(
+    { path: '/host/api/quizzes/import', method: 'POST', headers: authHeaders() },
+    { invalid: true }
+  );
+  check('POST /quizzes/import invalid body → 400', importBad.status === 400);
+
+  // Clean up imported quiz
+  if (impQuizId) {
+    await req({ path: `/host/api/quizzes/${impQuizId}`, method: 'DELETE', headers: authHeaders() });
+  }
+}
+
 async function testSessionLifecycle(quizId) {
   console.log('\n── Session Lifecycle ─────────────────────────────────────────────');
 
@@ -533,6 +579,7 @@ async function testLanguageSettings() {
     await testTFQuestions(quizId);
     await testImageExplanation(quizId);
     const dupQuizId = await testDuplicate(quizId);
+    await testQuizExportImport(quizId);
     await testSessionLifecycle(quizId);
     await testSessionHistory();
     await testDeleteCleanup(quizId, dupQuizId);
