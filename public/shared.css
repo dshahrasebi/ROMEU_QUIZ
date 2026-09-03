@@ -1,30 +1,160 @@
-/* ── Tile palette ─────────────────────────────────────────────────────────── */
+/* ── Romeu corporate theme ─────────────────────────────────────────────────── */
 :root {
-  --tile-red:    #E21B3C;
-  --tile-blue:   #1368CE;
-  --tile-yellow: #D89E00;
-  --tile-green:  #26890C;
+  --navy-900:    #0f1d35;
+  --navy-800:    #172746;
+  --navy-700:    #263a60;
+  --green-500:   #55b878;
+  --green-600:   #42945f;
+  --ink:         #18253d;
+  --muted:       #68758a;
+  --page:        #f3f5f8;
+  --surface:     #ffffff;
+  --accent:      #55b878;
+  --tile-red:    #c94d55;
+  --tile-blue:   #315b91;
+  --tile-yellow: #c99832;
+  --tile-green:  #65a83d;
 }
 
 /* ── Base ─────────────────────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-/* Match html background to the dark edge of the gradient so iOS Safari's
-   status-bar chrome area (exposed by viewport-fit=cover) is purple, not white. */
 html {
-  background: #46178F;
+  background: var(--navy-900);
 }
 
 body {
-  font-family: 'Nunito', sans-serif;
+  font-family: 'Open Sans', sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 
 /* ── Background ──────────────────────────────────────────────────────────── */
 .gradient-bg {
-  background: radial-gradient(ellipse at center, #8B2FC9 0%, #46178F 100%);
+  background:
+    radial-gradient(circle at 12% 8%, rgba(85,184,120,0.16), transparent 28%),
+    linear-gradient(135deg, rgba(85,184,120,0.08), transparent 38%),
+    linear-gradient(160deg, var(--navy-800) 0%, var(--navy-900) 72%);
   min-height: 100vh;
   color: #fff;
+}
+
+.gradient-bg::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  opacity: 0.18;
+  pointer-events: none;
+  background-image: linear-gradient(rgba(255,255,255,0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.035) 1px, transparent 1px);
+  background-size: 32px 32px;
+  mask-image: linear-gradient(to bottom right, black, transparent 70%);
+}
+
+.gradient-bg::before {
+  content: '';
+  position: fixed;
+  inset: 0 0 auto;
+  height: 4px;
+  background: var(--green-500);
+  box-shadow: 0 1px 12px rgba(85,184,120,0.4);
+  z-index: 10000;
+  pointer-events: none;
+}
+
+button, input, select, textarea { font-family: inherit; }
+
+.romeu-logo {
+  display: block;
+  width: 100%;
+  height: 72px;
+  object-fit: contain;
+  object-position: center;
+  padding: 4px;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(5,15,32,0.16);
+}
+.romeu-logo-login { max-width: 250px; height: 72px; margin-inline: auto; }
+.romeu-logo-host { width: 156px; height: 48px; }
+.romeu-logo-display { width: 300px; height: 76px; }
+.romeu-logo-player { width: min(290px, 82vw); height: 74px; margin-inline: auto; }
+.romeu-logo-wait { width: 250px; height: 68px; margin-inline: auto; }
+
+button:not(.answer-tile) {
+  border: 1px solid rgba(255,255,255,0.14);
+  transition: transform 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
+}
+button:not(.answer-tile):hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px rgba(15,29,53,0.22);
+}
+button:not(.answer-tile):active { transform: translateY(0); }
+
+input, select, textarea {
+  box-shadow: 0 2px 8px rgba(15,29,53,0.08);
+}
+
+/* Tailwind utilities used by the original UI, remapped to the corporate palette. */
+.text-purple-800, .text-purple-700, .text-purple-600 { color: var(--navy-800) !important; }
+.bg-purple-700, .bg-purple-800 { background-color: var(--navy-800) !important; }
+.bg-purple-500 { background-color: var(--green-600) !important; }
+.bg-white.text-purple-800, .bg-white.text-purple-700,
+.bg-white.text-purple-600 { background-color: var(--green-500) !important; color: var(--navy-900) !important; }
+.bg-white.text-purple-800:hover, .bg-white.text-purple-700:hover,
+.bg-white.text-purple-600:hover { background-color: #70c891 !important; }
+.hover\:bg-purple-50:hover { background-color: #edf5e5 !important; }
+.hover\:bg-purple-400:hover { background-color: var(--green-500) !important; }
+.hover\:bg-purple-800:hover { background-color: var(--navy-900) !important; }
+.focus\:border-purple-500:focus { border-color: var(--green-600) !important; }
+.focus\:ring-purple-300:focus { --tw-ring-color: rgba(85,184,120,0.45) !important; }
+.accent-purple-400, .accent-purple-500, .accent-purple-600 { accent-color: var(--green-500) !important; }
+
+/* Green is reserved for actions, selection and positive status. */
+.stab-active { box-shadow: inset 0 -3px 0 var(--green-500); }
+#panel-library > div:first-child h1::first-letter,
+#panel-settings > div:first-child h1::first-letter { color: var(--green-500); }
+#panel-library .bg-white\/10, #panel-settings .bg-white\/10 {
+  border: 1px solid rgba(85,184,120,0.28);
+}
+#panel-library .bg-white\/10:hover, #panel-settings .bg-white\/10:hover {
+  border-color: rgba(85,184,120,0.6);
+}
+
+/* The host panel keeps the live-game contrast, while forms use clean portal surfaces. */
+#panel-library, #panel-settings { color: #fff; }
+#panel-library > div:first-child,
+#panel-settings > div:first-child { border-bottom: 1px solid rgba(255,255,255,0.18); padding-bottom: 1rem; }
+#panel-library input, #panel-settings input, #panel-settings select,
+#panel-settings textarea { border-color: #dce2ea; }
+#panel-library input:focus, #panel-settings input:focus,
+#panel-settings select:focus, #panel-settings textarea:focus {
+  border-color: var(--green-600);
+  box-shadow: 0 0 0 3px rgba(85,184,120,0.22);
+}
+
+.bg-white\/10 { background-color: rgba(255,255,255,0.12) !important; }
+.bg-white\/20 { background-color: rgba(255,255,255,0.18) !important; }
+.bg-white\/25 { background-color: rgba(255,255,255,0.22) !important; }
+
+.backdrop-blur, .backdrop-blur-sm {
+  border: 1px solid rgba(255,255,255,0.14);
+  box-shadow: 0 16px 36px rgba(5,15,32,0.18);
+}
+
+/* Portal surfaces: navy framing with the corporate green used as a signal. */
+#panel-library .space-y-4 > div,
+#panel-history .bg-white\/10,
+#panel-settings > div[id^="stab-panel-"] > div {
+  border: 1px solid rgba(255,255,255,0.14);
+  border-left: 3px solid rgba(85,184,120,0.72);
+  box-shadow: 0 12px 28px rgba(5,15,32,0.16);
+}
+
+#panel-library .space-y-4 > div:hover,
+#panel-history .bg-white\/10:hover,
+#panel-settings > div[id^="stab-panel-"] > div:hover {
+  border-left-color: var(--green-500);
+  box-shadow: 0 16px 32px rgba(5,15,32,0.24);
 }
 
 /* ── Answer tiles ────────────────────────────────────────────────────────── */
@@ -34,12 +164,12 @@ body {
   align-items: center;
   justify-content: center;
   gap: 12px;
-  border-radius: 12px;
+  border-radius: 6px;
   cursor: pointer;
   user-select: none;
   touch-action: manipulation;
-  transition: transform 0.1s;
-  font-family: 'Nunito', sans-serif;
+  transition: transform 0.18s ease, filter 0.18s ease, box-shadow 0.18s ease;
+  font-family: 'Open Sans', sans-serif;
   font-weight: 700;
   font-size: 1.25rem;
   color: #fff;
@@ -50,6 +180,11 @@ body {
 
 .answer-tile:active {
   transform: scale(0.96);
+}
+
+.answer-tile:hover {
+  filter: brightness(1.08) saturate(1.05);
+  box-shadow: 0 12px 24px rgba(5,15,32,0.2);
 }
 
 .answer-tile.disabled {
@@ -93,6 +228,9 @@ body {
   transform-origin: bottom;
   border-radius: 8px 8px 0 0;
 }
+
+.rounded-xl, .rounded-2xl { border-radius: 6px; }
+.shadow-lg, .shadow-2xl { box-shadow: 0 10px 28px rgba(15,29,53,0.18); }
 
 /* ── Animations ──────────────────────────────────────────────────────────── */
 

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Host Panel · Quiz Platform</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="/shared.css">
   <script src="/socket.io/socket.io.js"></script>
@@ -28,7 +28,7 @@
     }
     .stab { background: rgba(255,255,255,0.15); color: white; }
     .stab:hover { background: rgba(255,255,255,0.25); }
-    .stab-active { background: white !important; color: #5b21b6 !important; }
+    .stab-active { background: white !important; color: #172746 !important; }
 
     /* ── Widescreen mode (16:9 TV) ──────────────────────────────────── */
     #panel-game.widescreen { max-width: none; padding: 0.75rem 1.5rem; }
@@ -87,7 +87,10 @@
 <!-- ── LIBRARY PANEL ──────────────────────────────────────────────────────── -->
 <div id="panel-library" class="max-w-4xl mx-auto p-6">
   <div class="flex items-center justify-between mb-6">
-    <h1 class="text-3xl font-black" data-i18n="host.your_quizzes">🎮 Your Quizzes</h1>
+    <div class="flex items-center gap-4">
+      <img src="/logo.svg" alt="Romeu Quiz" class="romeu-logo romeu-logo-host" onerror="this.src='/logo.png'">
+      <h1 class="text-3xl font-black" data-i18n="host.your_quizzes">🎮 Your Quizzes</h1>
+    </div>
     <div class="flex gap-2 flex-wrap items-center">
       <button id="btn-new-quiz"
         class="bg-white text-purple-800 font-black px-4 py-2 rounded-xl hover:bg-purple-50 transition-colors"
@@ -195,7 +198,7 @@
         <div class="flex gap-3 items-center">
           <input id="s-accent_color" type="text" maxlength="7"
             class="flex-1 rounded-xl px-4 py-3 text-gray-800 font-bold focus:outline-none focus:ring-2 focus:ring-white"
-            placeholder="#7c3aed">
+            placeholder="#55b878">
           <input type="color" id="s-accent_color_picker"
             class="w-12 h-12 rounded-xl border-0 cursor-pointer bg-transparent"
             oninput="document.getElementById('s-accent_color').value=this.value">
@@ -705,7 +708,7 @@
    ════════════════════════════════════════════════════════════════════════════ */
 
 const SHAPES  = ['▲', '◆', '●', '■'];
-const COLORS  = ['#E21B3C', '#1368CE', '#D89E00', '#26890C'];
+const COLORS  = ['#c94d55', '#315b91', '#c99832', '#65a83d'];
 
 let socket = null;
 let activePin = null;
@@ -1036,8 +1039,8 @@ async function loadSettingsPanel() {
     const picker   = document.getElementById('s-accent_color_picker');
     const preview  = document.getElementById('s-accent_preview');
     if (accentEl && picker && preview) {
-      picker.value = s.accent_color || '#7c3aed';
-      preview.style.background = s.accent_color || '#7c3aed';
+      picker.value = s.accent_color || '#55b878';
+      preview.style.background = s.accent_color || '#55b878';
     }
     // Cache default time limit for new questions
     if (s.default_time_limit) _defaultTimeLimit = parseInt(s.default_time_limit, 10) || 20;
@@ -1771,7 +1774,7 @@ function _connectSocket() {
       document.querySelectorAll('#response-chips span').forEach(chip => {
         if (answered.has(chip.dataset.nickname)) {
           chip.style.background = '#fff';
-          chip.style.color = '#46178F';
+          chip.style.color = '#172746';
         }
       });
       document.getElementById('response-counter').textContent =
@@ -1798,7 +1801,7 @@ function _connectSocket() {
     }
     // Color response chips by chosen option + streak badges
     if (data.playerResults) {
-      const CHIP_COLORS = ['#E21B3C','#1368CE','#D89E00','#26890C'];
+      const CHIP_COLORS = ['#c94d55','#315b91','#c99832','#65a83d'];
       document.querySelectorAll('#response-chips span').forEach(chip => {
         const nn = chip.dataset.nickname;
         const r  = data.playerResults[nn];
@@ -1933,7 +1936,7 @@ function _renderMainLeaderboard(list) {
             <span class="font-black w-8 text-right ${fontSize}">${medal || rank}</span>
             <span class="flex-1 font-bold ${fontSize} truncate">${esc(p.nickname)}</span>
             <div class="w-1/3 bg-white/10 rounded-full h-3 overflow-hidden">
-              <div class="h-full rounded-full transition-all duration-700" style="width:${barW}%;background:${isTop3 ? '#a78bfa' : 'rgba(255,255,255,0.4)'}"></div>
+                  <div class="h-full rounded-full transition-all duration-700" style="width:${barW}%;background:${isTop3 ? '#55b878' : 'rgba(255,255,255,0.4)'}"></div>
             </div>
             <span class="font-black ${fontSize} w-16 text-right">${p.score}</span>
           </div>
@@ -1953,7 +1956,7 @@ function _renderPodium(podium) {
   const heights = podium.map(p => Math.round((p.score / maxScore) * 150 + 50));
   const orderMap = { 0: 1, 1: 0, 2: 2 }; // 2nd, 1st, 3rd
   const delays  = [0.6, 1.0, 0.3];
-  const podiumColors = ['#8B2FC9','#F5C518','#9E9E9E'];
+  const podiumColors = ['#42945f','#c99832','#8b98aa'];
   return `
     <div class="flex items-end justify-center gap-6 pt-6">
       ${podium.slice(0, 3).map((p, i) => {

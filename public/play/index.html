@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <title>Join Quiz</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="/shared.css">
   <script src="/i18n.js"></script>
@@ -120,7 +120,7 @@
 <!-- ── Screen 1: PIN entry ────────────────────────────────────────────────── -->
 <div id="screen-pin" class="screen active flex-col items-center justify-center h-full p-6 gap-5">
   <div class="text-center">
-    <div class="text-5xl mb-2">🎮</div>
+    <div id="pin-logo-wrap" class="mb-3"><img id="pin-logo" src="/logo.svg" alt="Romeu Quiz" class="romeu-logo romeu-logo-player" onerror="this.src='/logo.png'"><img id="pin-logo-fallback" src="/logo.svg" alt="Romeu Quiz" class="hidden" onerror="this.src='/logo.png'"></div>
     <h1 class="text-3xl font-black" data-i18n="play.join_game">Join a Game</h1>
   </div>
   <div class="w-full max-w-xs space-y-3">
