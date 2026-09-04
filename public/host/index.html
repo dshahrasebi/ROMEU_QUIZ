@@ -1552,34 +1552,44 @@ async function handleImportFile(event) {
 }
 
 async function loadHistory() {
-  document.getElementById('history-list').innerHTML = `<p class="text-white/40 font-bold text-center py-8">${t('host.loading')}</p>`;
+  const historyList = document.getElementById('history-list');
+  historyList.innerHTML = `<p class="text-white/40 font-bold text-center py-8">${t('host.loading')}</p>`;
   try {
-  const res = await apiFetch('/host/api/sessions');
-  if (!res.ok) { console.error('Failed to load history:', res.status); return; }
-  const sessions = await res.json();
-  if (!Array.isArray(sessions) || !sessions.length) {
-    document.getElementById('history-list').innerHTML = `<p class="text-white/40 font-bold text-center py-8">${t('host.no_sessions')}</p>`;
-    return;
-  }
-  document.getElementById('history-list').innerHTML = sessions.map(s => `
-    <div class="bg-white/10 backdrop-blur rounded-2xl p-4">
-      <div class="flex items-center gap-4 flex-wrap">
-        <div class="flex-1 min-w-0">
-          <p class="font-black text-lg truncate">${esc(s.quiz_name)}</p>
-          <p class="text-white/50 text-sm font-bold mt-0.5">
-            ${new Date(s.started_at).toLocaleString()} &middot; ${s.player_count} player${s.player_count !== 1 ? 's' : ''}
-            ${s.winner_nickname ? ` &middot; 🏆 ${esc(s.winner_nickname)} (${s.winner_score})` : ''}
-          </p>
+    const res = await apiFetch('/host/api/sessions');
+    if (!res.ok) throw new Error(`History request failed: ${res.status}`);
+    const sessions = await res.json();
+    if (!Array.isArray(sessions) || !sessions.length) {
+      historyList.innerHTML = `<p class="text-white/40 font-bold text-center py-8">${t('host.no_sessions')}</p>`;
+      return;
+    }
+    historyList.innerHTML = sessions.map(s => `
+      <div class="bg-white/10 backdrop-blur rounded-2xl p-4">
+        <div class="flex items-center gap-4 flex-wrap">
+          <div class="flex-1 min-w-0">
+            <p class="font-black text-lg truncate">${esc(s.quiz_name)}</p>
+            <p class="text-white/50 text-sm font-bold mt-0.5">
+              ${new Date(s.started_at).toLocaleString()} &middot; ${s.player_count} player${s.player_count !== 1 ? 's' : ''}
+              ${s.winner_nickname ? ` &middot; 🏆 ${esc(s.winner_nickname)} (${s.winner_score})` : ''}
+            </p>
+          </div>
+          <button onclick="toggleSessionDetail(${s.id}, this)"
+            class="bg-white/20 hover:bg-white/30 text-white font-bold px-3 py-1.5 rounded-xl text-sm transition-colors">
+            ${t('host.btn_details')}
+          </button>
         </div>
-        <button onclick="toggleSessionDetail(${s.id}, this)"
-          class="bg-white/20 hover:bg-white/30 text-white font-bold px-3 py-1.5 rounded-xl text-sm transition-colors">
-          ${t('host.btn_details')}
-        </button>
+        <div id="session-detail-${s.id}" class="hidden mt-3"></div>
       </div>
-      <div id="session-detail-${s.id}" class="hidden mt-3"></div>
-    </div>
-  `).join('');
-  } catch (e) { console.error('loadHistory error:', e); }
+    `).join('');
+  } catch (e) {
+    console.error('loadHistory error:', e);
+    historyList.innerHTML = `
+      <div class="text-center py-8">
+        <p class="text-white/60 font-bold">${t('host.network_error')}</p>
+        <button onclick="loadHistory()" class="mt-3 bg-white/20 hover:bg-white/30 text-white font-bold px-4 py-2 rounded-xl transition-colors">
+          ${t('host.btn_retry')}
+        </button>
+      </div>`;
+  }
 }
 
 async function toggleSessionDetail(sessionId, btn) {
