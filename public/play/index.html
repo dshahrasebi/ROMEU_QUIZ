@@ -48,7 +48,30 @@
 
     .answer-tile {
       min-height: 0;
+      min-width: 0;
+      overflow: hidden;
+      flex-direction: column;
       transition: opacity 0.22s ease, transform 0.22s ease;
+    }
+
+    .answer-tile .opt-label {
+      min-width: 0;
+      max-width: 100%;
+      overflow-wrap: anywhere;
+      line-height: 1.12;
+    }
+
+    @media (max-width: 600px) {
+      .answer-tile {
+        gap: 8px;
+        padding: 10px;
+        font-size: clamp(0.8rem, 4.5vw, 1.15rem);
+      }
+
+      .answer-tile .shape-icon svg {
+        width: clamp(32px, 12vw, 48px);
+        height: clamp(32px, 12vw, 48px);
+      }
     }
 
     /* Shape icons — SVG-based so all four are pixel-identical in visual mass.
